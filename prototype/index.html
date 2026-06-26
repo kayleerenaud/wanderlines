@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Wanderlines</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Bungee&family=Caveat:wght@400;600;700&family=EB+Garamond:ital@0;1&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;600;700&family=Jost:wght@400;500;700&family=Monoton&family=Patrick+Hand&family=Quicksand:wght@400;600;700&family=Righteous&family=Shadows+Into+Light&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@master/qrcode.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   /* ===== THEME TOKENS — swap data-theme to reskin; scaffolding never changes ===== */
   :root,[data-theme="retro"]{ /* retro — bold vintage pop, amped */
@@ -15,7 +18,7 @@
     --paper:#f8eccf; --ink:#2a1d14; --muted:#9a7e57; --rule:#d6a347;
     --field:#fff7e6; --hover:#fdeecb; --accent:#df4d12; --accent2:#0c8a6f; --gold:#eaa314;
     --c-lived:#df4d12; --c-visited:#0c8a6f; --on-accent:#fff;
-    --photo-filter:sepia(.22) saturate(1.15) contrast(1.05); --grain-opacity:.14;
+    --photo-filter:sepia(.22) saturate(1.15) contrast(1.05); --grain-opacity:.14; --route-dash:7 4; --grid:#c79a52;
     --font:"Jost",-apple-system,"Segoe UI",sans-serif;
     --font-display:"Bungee","Jost",sans-serif; --font-hand:"Caveat",cursive;
   }
@@ -25,7 +28,7 @@
     --paper:#16181c; --ink:#eef1f5; --muted:#99a0ac; --rule:#33373f;
     --field:#1f2228; --hover:#262a31; --accent:#c4ccd6; --accent2:#878f9b; --gold:#d6dce4;
     --c-lived:#d2d8e0; --c-visited:#7f8893;
-    --photo-filter:grayscale(.45) contrast(1.12) brightness(1.02); --grain-opacity:.1;
+    --photo-filter:grayscale(.45) contrast(1.12) brightness(1.02); --grain-opacity:.1; --route-dash:1 7; --grid:#3a3f48;
     --font:"Inter",-apple-system,"Helvetica Neue",Arial,sans-serif;
     --font-display:"Space Grotesk","Inter",sans-serif; --font-hand:"Caveat",cursive;
   }
@@ -34,7 +37,7 @@
     --paper:#1d0636; --ink:#fdeeff; --muted:#c79be0; --rule:#7a2bd0;
     --field:#270a40; --hover:#350b54; --accent:#ff2bd6; --accent2:#1fe3cb; --gold:#f5e63d;
     --c-lived:#ff2bd6; --c-visited:#1fe3cb;
-    --photo-filter:saturate(1.6) contrast(1.1) hue-rotate(-6deg); --grain-opacity:.16;
+    --photo-filter:saturate(1.6) contrast(1.1) hue-rotate(-6deg); --grain-opacity:.16; --route-dash:10 4; --grid:#5a2a8a;
     --font:"Righteous",-apple-system,"Segoe UI",sans-serif;
     --font-display:"Monoton","Righteous",sans-serif; --font-hand:"Caveat",cursive;
   }
@@ -43,7 +46,7 @@
     --paper:#eef0e3; --ink:#26301f; --muted:#7c8a6c; --rule:#a8b58f;
     --field:#f7f9ef; --hover:#e9eedd; --accent:#5b7a3a; --accent2:#a3672f; --gold:#bf8f33;
     --c-lived:#a3672f; --c-visited:#5b7a3a;
-    --photo-filter:sepia(.18) saturate(.92) contrast(1.02); --grain-opacity:.13;
+    --photo-filter:sepia(.18) saturate(.92) contrast(1.02); --grain-opacity:.13; --route-dash:none; --grid:#9aab86;
     --font:"Georgia","Iowan Old Style",serif;
     --font-display:"Fraunces","Georgia",serif; --font-hand:"Caveat",cursive;
   }
@@ -52,7 +55,7 @@
     --paper:#fdf5fa; --ink:#6f5a64; --muted:#bda4b4; --rule:#f0d3e0;
     --field:#fffbfe; --hover:#fbeef6; --accent:#f3a6c6; --accent2:#f3d089; --gold:#f1cd7c;
     --c-lived:#f1a3c4; --c-visited:#eccb84;
-    --photo-filter:saturate(1.12) brightness(1.05) contrast(.96); --grain-opacity:.08;
+    --photo-filter:saturate(1.12) brightness(1.05) contrast(.96); --grain-opacity:.08; --route-dash:2 6; --grid:#e6b8cf;
     --font:"Quicksand",-apple-system,"Segoe UI",sans-serif;
     --font-display:"Baloo 2","Quicksand",sans-serif; --font-hand:"Patrick Hand",cursive;
   }
@@ -61,7 +64,7 @@
     --paper:#f1e8d3; --ink:#3a2f25; --muted:#9a8467; --rule:#c3ad84;
     --field:#f6efdd; --hover:#ece0c6; --accent:#a6442e; --accent2:#4a5a6a; --gold:#9a6b34;
     --c-lived:#a6442e; --c-visited:#4a5a6a;
-    --photo-filter:sepia(.5) contrast(1.06) brightness(1.02); --grain-opacity:.2;
+    --photo-filter:sepia(.5) contrast(1.06) brightness(1.02); --grain-opacity:.2; --route-dash:8 3 2 3; --grid:#b09058;
     --font:"EB Garamond","Hoefler Text",Georgia,serif;
     --font-display:"Caveat",cursive; --font-hand:"Shadows Into Light",cursive;
   }
@@ -74,8 +77,9 @@
   #app{height:100dvh;display:flex;flex-direction:column}
 
   /* ---------- header ---------- */
-  header{height:var(--hdr);flex:none;display:flex;align-items:center;justify-content:space-between;
-    padding:0 16px;background:var(--paper);border-bottom:3px double var(--rule);position:relative;z-index:40}
+  header{min-height:var(--hdr);flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:env(safe-area-inset-top,0) calc(16px + env(safe-area-inset-right,0)) 0 calc(16px + env(safe-area-inset-left,0));
+    background:var(--paper);border-bottom:3px double var(--rule);position:relative;z-index:40}
   .brand{font-size:18px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink)}
   .brand small{display:block;font-size:8px;letter-spacing:.34em;color:var(--accent);margin-top:1px}
   .navbtn{width:42px;height:42px;border:1px solid var(--rule);border-radius:9px;background:var(--field);
@@ -104,7 +108,7 @@
   #view-world,#view-region{background:radial-gradient(circle at 30% 18%, var(--ocean-hi), var(--ocean))}
   svg.map{display:block;width:100%;height:100%;touch-action:none}
   .sphere{fill:var(--ocean)}
-  .graticule{fill:none;stroke:#d3ccbb;stroke-width:.4;opacity:.6}
+  .graticule{fill:none;stroke:var(--grid,#b79a6a);stroke-width:.5;opacity:.7}
   .country,.region{stroke:var(--land-stroke);stroke-width:.18;fill:var(--land);cursor:pointer;pointer-events:all}
   .country.wish,.region.wish{fill:none;stroke:var(--gold);stroke-width:.9;stroke-dasharray:2 1.4}
 
@@ -118,8 +122,9 @@
     box-shadow:0 4px 14px #0003;cursor:pointer;z-index:6}
   .fab:active{transform:scale(.94)}
   #share-fab{bottom:18px;right:16px}
-  #paint-fab{bottom:18px;left:16px;font-size:12px;letter-spacing:.06em;width:auto;border-radius:25px;padding:0 16px;gap:8px}
-  #paint-fab .dot{width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 1px #0002}
+  #paint-fab{bottom:18px;left:16px;height:46px;width:auto;border-radius:25px;padding:0 16px 0 14px;gap:7px;font-size:15px;font-weight:600;letter-spacing:.01em;color:var(--ink)}
+  #paint-fab .dot{display:inline-flex;align-items:center;justify-content:center;color:var(--accent)}
+  #paint-fab #paint-label{line-height:1}
 
 
   #tip,#tip2{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font-size:13px;
@@ -164,6 +169,7 @@
   .yeargroup .yr{font-size:13px;font-weight:700;color:var(--accent2);margin:10px 0 2px}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chip{font-size:12px;background:var(--hover);border:1px solid var(--rule);border-radius:20px;padding:4px 10px}
+  .chip.wishchip{border-style:dashed;border-color:var(--gold);color:var(--muted)}
   .field{margin-bottom:12px}
   .field label{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
   .field input{width:100%;border:1px solid var(--rule);background:var(--field);border-radius:8px;padding:10px 12px;font:inherit}
@@ -202,9 +208,9 @@
   .helpbtn{width:42px;height:42px;border:1px solid var(--rule);border-radius:9px;background:var(--field);
     display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;font-weight:700;color:var(--accent)}
   @keyframes fade{from{opacity:0}to{opacity:1}}
-  #help{position:fixed;inset:0;z-index:90;background:#1e1b16ee;display:none;overflow-y:auto}
-  #help.open{display:flex;align-items:center;justify-content:center;padding:24px;animation:fade .2s ease}
-  .help-card{width:100%;max-width:340px;background:var(--paper);border-radius:18px;box-shadow:0 18px 50px #0006;padding:22px 20px;animation:rise .25s ease}
+  #help{position:fixed;inset:0;z-index:90;background:#1e1b16ee;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #help.open{display:block;animation:fade .2s ease}
+  .help-card{width:100%;max-width:340px;margin:24px auto;background:var(--paper);border-radius:18px;box-shadow:0 18px 50px #0006;padding:22px 20px;animation:rise .25s ease}
   .help-card h2{margin:0 0 2px;font-size:19px;letter-spacing:.04em;text-align:center}
   .help-card .hsub{text-align:center;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
   .help-row{display:flex;gap:12px;align-items:flex-start;padding:11px 2px;border-top:1px solid #00000010}
@@ -219,11 +225,16 @@
 
   /* ---------- map top controls: search + layers ---------- */
   .mapctl{position:absolute;top:10px;left:12px;right:12px;display:flex;gap:8px;z-index:9;align-items:flex-start}
+  /* on wide / landscape screens keep the search bar compact so it doesn't cover the map */
+  @media (min-width:640px){ .mapctl{right:auto;width:360px} }
+  .journey.tappable{cursor:pointer;transition:box-shadow .15s,transform .05s}
+  .journey.tappable:hover{box-shadow:0 5px 18px #0002}
+  .journey.tappable:active{transform:scale(.997)}
   .searchbox{position:relative;flex:1}
   .searchbox .si{position:absolute;left:12px;top:21px;transform:translateY(-50%);font-size:13px;opacity:.55;pointer-events:none}
-  #search-in{width:100%;border:1px solid var(--rule);background:var(--field);border-radius:22px;padding:10px 14px 10px 33px;
+  .searchbox input{width:100%;border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:22px;padding:10px 14px 10px 33px;
     font:inherit;font-size:14px;box-shadow:0 4px 14px #0002}
-  #search-in:focus{outline:none;border-color:var(--accent)}
+  .searchbox input:focus{outline:none;border-color:var(--accent)}
   .sres{position:absolute;top:46px;left:0;right:0;background:var(--paper);border:1px solid var(--rule);
     border-radius:12px;box-shadow:0 10px 30px #0003;overflow:hidden;display:none;max-height:240px;overflow-y:auto;z-index:12}
   .sres.open{display:block}
@@ -244,6 +255,11 @@
   .lyr .d{width:12px;height:12px;border-radius:50%;flex:none}
   .lyr .d.parks{background:#2f7d4f}
   .lyr .d.unesco{background:#6c5ce0}
+  .lyr .d.journeys{background:var(--accent)}
+  .key-sec{margin-top:8px;padding-top:8px;border-top:1px solid var(--rule)}
+  .key-lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .route-dot{stroke:#fff}
+  .route-line.route-faint{opacity:.75;stroke-dasharray:none}
   .lyr-note{font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.45}
   .pin{cursor:pointer;stroke:#fff;stroke-width:.7;opacity:.62}
   .pin.parks{fill:#2f7d4f}
@@ -261,7 +277,7 @@
   .journey .jh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .journey .jn{font-size:16px;font-weight:600}
   .jrate{color:var(--gold);font-size:13px;letter-spacing:1px;flex:none;white-space:nowrap}
-  .jrate .off{color:var(--rule)}
+  .jrate .off{color:var(--rule);opacity:.4}
   .journey .jd{font-size:11px;color:var(--muted);letter-spacing:.04em;margin-top:2px}
   .journey .jact{display:flex;gap:8px;margin-top:12px}
   .journey .jact .btn{flex:1;justify-content:center;font-size:12px;padding:9px}
@@ -273,7 +289,7 @@
   #journey-modal.open{display:flex;animation:fade .15s ease}
   #journey-modal .detail-card{max-height:92vh;overflow-y:auto}
   /* route line on the world map */
-  .route-line{fill:none;stroke:var(--accent);stroke-dasharray:5 4;stroke-linecap:round;opacity:.92}
+  .route-line{fill:none;stroke:var(--accent);stroke-linecap:round;stroke-linejoin:round;opacity:1}
   .route-pin{fill:var(--accent);stroke:#fff}
   .route-num{fill:#fff;font-weight:700;pointer-events:none}
   #route-banner{position:absolute;top:62px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);
@@ -303,8 +319,9 @@
   .trav .ti{flex:1;display:grid;grid-template-columns:1fr 70px;gap:6px}
   .trav .avatar{width:40px;height:40px;border-radius:50%;border:none;color:#fff;font-weight:700;font-size:17px;cursor:pointer;flex:none;line-height:1;padding:0;display:flex;align-items:center;justify-content:center}
   .stars{display:flex;gap:5px;font-size:28px}
-  .stars .star{color:var(--rule);cursor:pointer;line-height:1}
-  .stars .star.on{color:var(--gold)}
+  .stars .star{color:var(--rule);opacity:.35;cursor:pointer;line-height:1;transition:transform .1s}
+  .stars .star.on{color:var(--gold);opacity:1;text-shadow:0 1px 4px color-mix(in srgb,var(--gold) 55%,transparent)}
+  .stars .star.on:active{transform:scale(1.2)}
   .rev-q{margin-bottom:11px}
   .rev-q .seg button{min-width:auto;padding:8px 9px;font-size:12px}
   .vehicles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -328,14 +345,28 @@
   .rem-add{display:flex;gap:8px;margin-top:10px}
   .rem-add input{flex:1;min-width:0;border:1px solid var(--rule);background:var(--field);border-radius:8px;padding:9px 11px;font:inherit;font-size:13px;color:var(--ink)}
   .acc-controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:-2px 0 12px}
-  .acc-controls button{background:none;border:none;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;padding:2px 4px;text-decoration:underline}
+  .acc-controls button{background:none;border:none;color:var(--accent);font:inherit;font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:3px 5px}
   .acc-controls span{color:var(--muted)}
   #route-name{cursor:pointer;text-decoration:underline}
-  /* one photo per journal entry — framed, with a per-vibe filter + grain */
-  .je-photo{margin:8px 0;border:5px solid var(--paper);box-shadow:0 0 0 1px var(--rule),0 4px 12px #0003;border-radius:4px;overflow:hidden;position:relative;line-height:0}
-  .je-photo img{width:100%;display:block;filter:var(--photo-filter,none)}
-  .je-photo::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:var(--grain-opacity,.12);mix-blend-mode:overlay;
+  /* one photo per journal entry — pick a frame; per-vibe filter + grain on the image */
+  .je-photo{margin:10px 0;position:relative;line-height:0;width:100%}
+  .je-photo .ph{position:relative;overflow:hidden;line-height:0;border-radius:2px}
+  .je-photo .ph img{width:100%;display:block;filter:var(--photo-filter,none)}
+  .je-photo .ph::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:var(--grain-opacity,.12);mix-blend-mode:overlay;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  /* ---- frame styles ---- */
+  .je-photo.f-none .ph{border-radius:9px}
+  .je-photo.f-mat{padding:5px;background:var(--paper);box-shadow:0 0 0 1px var(--rule),0 5px 14px #0003;border-radius:4px}
+  .je-photo.f-polaroid{padding:11px 11px 38px;background:#fbfaf6;box-shadow:0 5px 18px #0004;border-radius:2px;transform:rotate(-1.5deg)}
+  .je-photo.f-polaroid::after{content:"";position:absolute;left:0;right:0;bottom:14px;text-align:center;color:#9a8e7a;font:14px/1 var(--font-hand,cursive)}
+  .je-photo.f-vintage{padding:9px;background:#fcf8ee;border-radius:2px;box-shadow:0 3px 12px #0003}
+  .je-photo.f-vintage .ph{box-shadow:0 0 0 1px #0000002a, inset 0 0 0 3px #fff}
+  .je-photo.f-film{padding:18px 11px;background:#191919;border-radius:5px;box-shadow:0 4px 14px #0004}
+  .je-photo.f-film::before,.je-photo.f-film::after{content:"";position:absolute;left:11px;right:11px;height:8px;background:repeating-linear-gradient(90deg,#0000 0 5px,#d9d9d9 5px 11px);opacity:.6}
+  .je-photo.f-film::before{top:5px}.je-photo.f-film::after{bottom:5px}
+  .je-photo.f-tape::before,.je-photo.f-tape::after{content:"";position:absolute;width:62px;height:22px;top:-9px;z-index:2;
+    background:color-mix(in srgb, var(--gold) 55%, transparent);box-shadow:0 1px 3px #0003}
+  .je-photo.f-tape::before{left:16px;transform:rotate(-6deg)} .je-photo.f-tape::after{right:16px;transform:rotate(5deg)}
   .je-photo-pick{display:inline-block;margin:8px 0 0;border:1px dashed var(--rule);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--muted);cursor:pointer}
   .veh .vic{font-size:23px;line-height:1}
   .veh .vlb{font-size:10px;color:var(--muted)}
@@ -365,8 +396,161 @@
   .iti-stop:last-child{border-bottom:none}
   .iti-stop .sh{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:6px}
   .iti-stop textarea{width:100%;border:1px solid var(--rule);background:var(--field);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;min-height:44px;resize:vertical}
-  .iti-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .iti-actions .btn{flex:1;justify-content:center;min-width:130px}
+  .iti-actions{display:flex;gap:10px}
+  .iti-actions .btn{flex:1;justify-content:center;padding:13px;white-space:nowrap;min-width:0}
+  .jbtns{display:flex;gap:8px;margin-bottom:14px}
+  .jbtns .btn{flex:1;justify-content:center;white-space:nowrap}
+  .je-edit{cursor:pointer;color:var(--muted);font-size:15px}
+  .je-edit:hover{color:var(--accent)}
+  /* US territory inset tiles (albersUsa can't place them on the map) */
+  #region-territories{position:absolute;left:12px;bottom:16px;display:none;flex-wrap:wrap;gap:6px;align-items:center;z-index:6;max-width:calc(100% - 84px)}
+  #region-territories.open{background:var(--paper);border:1px solid var(--rule);border-radius:14px;padding:8px 10px;box-shadow:0 4px 14px #0003}
+  .terr-toggle{border:1px solid var(--rule);background:var(--paper);color:var(--ink);border-radius:20px;padding:7px 13px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px #0003}
+  .terr-close{border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px;margin-left:2px}
+  .terr-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+  .terr{border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:8px;padding:6px 9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .terr.wish{border-style:dashed;border-color:var(--gold)}
+  /* ---------- badges (solid colour, line-art watermark + number share one colour) ---------- */
+  .badge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .badge{text-align:center;cursor:pointer}
+  .badge-emblem{width:60px;height:60px;margin:0 auto 7px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
+    background:var(--rule);color:var(--muted);border-radius:50%}
+  .badge.earned .badge-emblem{background:var(--accent);color:var(--on-accent);box-shadow:0 3px 10px color-mix(in srgb,var(--accent) 32%,transparent)}
+  /* Disco & Sleek keep the gradient; every other vibe uses a solid colour */
+  [data-theme="disco"] .badge.earned .badge-emblem,[data-theme="sleek"] .badge.earned .badge-emblem{background:linear-gradient(145deg,var(--accent),var(--accent2))}
+  .badge-ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.32}
+  .badge-n{position:relative;z-index:1;font-family:var(--font-display);font-size:20px;font-weight:700;line-height:1}
+  .badge.locked{opacity:.55}
+  .badge.locked .badge-emblem{filter:grayscale(.6)}
+  .badge-name{font-size:11px;color:var(--muted);line-height:1.2}
+  .badge.earned .badge-name{color:var(--ink)}
+  .shape-star .badge-emblem{border-radius:0;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+  .shape-shield .badge-emblem{border-radius:6px;clip-path:polygon(50% 0,100% 14%,100% 58%,50% 100%,0 58%,0 14%)}
+  .shape-diamond{padding-bottom:14px}
+  .shape-diamond .badge-emblem{width:50px;height:50px;border-radius:10px;transform:rotate(45deg)}
+  .shape-diamond .badge-n,.shape-diamond .badge-ico{transform:rotate(-45deg)}
+  /* passport stamps */
+  .pp-sec-lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;font-weight:600}
+  .stamp-group{margin-bottom:16px}
+  .stamp-cont{font-size:11px;letter-spacing:.05em;color:var(--muted);margin:0 0 9px;font-weight:600}
+  .stamps{display:flex;flex-wrap:wrap;gap:11px}
+  .stamp{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:88px;height:88px;text-align:center;padding:11px 7px 7px;
+    border:2px solid var(--accent);color:var(--accent);border-radius:50%;background:color-mix(in srgb,var(--accent) 6%,transparent);transform:rotate(var(--rot,0));
+    box-shadow:inset 0 0 0 4px var(--paper),inset 0 0 0 5.5px color-mix(in srgb,var(--accent) 40%,transparent)}
+  .stamp::before{content:"✦";position:absolute;top:9px;left:50%;transform:translateX(-50%);font-size:9px;opacity:.85}
+  .stamp b{font-family:var(--font-display);font-size:10.5px;line-height:1.04;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+  .stamp i{font-style:normal;font-size:11px;font-weight:700;margin-top:1px;padding-top:2px;border-top:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+  .pp-tabs{display:flex;gap:8px;margin-bottom:14px}
+  .pp-tab{border:1px solid var(--rule);background:var(--field);color:var(--muted);border-radius:20px;padding:6px 14px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .pp-tab.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  .flag-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .flag{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;padding:0;font:inherit}
+  .flag img{width:46px;height:auto;border-radius:3px;box-shadow:0 1px 4px #0003,0 0 0 1px #0001}
+  .flag .noflag{width:46px;height:31px;border-radius:3px;background:var(--rule)}
+  .flag .flag-nm{font-size:10px;color:var(--muted);line-height:1.15;text-align:center}
+  /* timeline */
+  .tl-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+  .tl-zoom{display:flex;align-items:center;gap:6px;flex:none;border:1px solid var(--rule);border-radius:22px;padding:4px 6px;background:var(--paper)}
+  .tl-zoom button{width:28px;height:28px;border:none;background:var(--field);border-radius:50%;font-size:18px;cursor:pointer;color:var(--ink);line-height:1}
+  .tl-zoom span{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:62px;text-align:center}
+  .tl-year{display:flex;gap:10px;padding:2px 0 18px;position:relative}
+  .tl-year::before{content:"";position:absolute;left:55px;top:6px;bottom:0;width:2px;background:var(--rule)}
+  .tl-y{font-family:var(--font-display);font-size:18px;color:var(--accent);width:46px;flex:none;text-align:right;position:relative;z-index:1}
+  .tl-items{display:flex;flex-wrap:wrap;gap:8px;flex:1;padding-left:16px;padding-top:2px}
+  .tl-entry{display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--rule);border-radius:18px;padding:5px 11px 5px 6px;font-size:13px;max-width:100%}
+  .tl-flag{width:22px;height:15px;border-radius:2px;box-shadow:0 0 0 1px #0001;flex:none}
+  .tl-ic{display:inline-flex;color:var(--accent);margin-left:3px}
+  .tl-nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+  /* QR share */
+  #qr-modal{position:fixed;inset:0;z-index:97;background:#1e1b1699;display:none;align-items:center;justify-content:center;padding:24px}
+  #qr-modal.open{display:flex;animation:fade .15s}
+  #qr-box{display:flex;justify-content:center;padding:12px;background:#fff;border-radius:12px}
+  #qr-box img,#qr-box canvas{display:block}
+  .share-btns{display:flex;flex-wrap:wrap;gap:8px}
+  .share-btns .btn{flex:1 1 110px;justify-content:center}
+  /* live map (Leaflet) share faces */
+  #livemap-modal{position:fixed;inset:0;z-index:98;background:#1e1b1699;display:none;align-items:center;justify-content:center;padding:18px}
+  #livemap-modal.open{display:flex;animation:fade .15s}
+  #livemap-modal .detail-card{max-width:560px;width:100%;border-radius:18px;max-height:94vh;display:flex;flex-direction:column;padding-bottom:16px}
+  #livemap{height:min(60vh,440px);border-radius:14px;overflow:hidden;border:1px solid var(--rule);background:var(--field)}
+  #livemap .leaflet-container{font:inherit;background:var(--field)}
+  .face-row{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 4px;-webkit-overflow-scrolling:touch}
+  .face{flex:none;border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:12px;padding:7px 13px;font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap}
+  .face.on{box-shadow:inset 0 0 0 2px var(--accent);border-color:var(--accent);color:var(--accent);font-weight:700}
+  .face-cred{font-size:10px;color:var(--muted);opacity:.85;margin-top:4px;min-height:13px}
+  .face-cred a{color:var(--muted);text-decoration:underline}
+  /* passport share card */
+  #card-modal{position:fixed;inset:0;z-index:98;background:#1e1b1699;display:none;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+  #card-modal.open{display:flex;animation:fade .15s}
+  #card-preview{border-radius:12px;overflow:hidden;box-shadow:0 8px 30px #0004;min-height:120px;display:flex;align-items:center;justify-content:center;background:var(--field)}
+  #card-preview img,#card-preview canvas{display:block;width:100%;height:auto;border-radius:12px}
+  /* explore grid */
+  .ex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .ex-tab{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid var(--rule);background:var(--paper);color:var(--ink);
+    border-radius:14px;padding:10px 12px;font:inherit;cursor:pointer;transition:transform .08s,border-color .12s}
+  .ex-tab:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .ex-tab img{width:34px;height:23px;object-fit:cover;border-radius:3px;box-shadow:0 1px 4px #0003;flex:none}
+  .ex-tab span{font-size:13.5px;line-height:1.2;overflow:hidden;text-overflow:ellipsis}
+  .ex-tab .mk{width:7px;height:7px;border-radius:50%;flex:none;margin-left:auto}
+  .ex-empty{color:var(--muted);font-size:13px;padding:14px 2px}
+  /* country detail modal */
+  #country-modal{position:fixed;inset:0;z-index:99;background:#1e1b1699;display:none;align-items:flex-end;justify-content:center}
+  #country-modal.open{display:flex;animation:fade .15s}
+  @media(min-width:560px){#country-modal{align-items:center;padding:24px}}
+  .cm-card{padding:0;overflow:hidden;max-height:92vh;display:flex;flex-direction:column;max-width:460px}
+  @media(min-width:560px){.cm-card{border-radius:18px}}
+  .cm-hero{position:relative;height:190px;background:var(--hover) center/cover no-repeat;flex:none;transition:background-image .2s}
+  .cm-hero.zoomable{cursor:zoom-in}
+  .cm-hero-grad{position:absolute;inset:0;background:linear-gradient(180deg,#0000 38%,#00000088)}
+  .cm-hero .x{position:absolute;top:10px;right:12px;z-index:2;font-size:16px;color:#fff;cursor:pointer;background:#0006;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+  .cm-hero-cap{position:absolute;left:14px;bottom:12px;z-index:2;display:flex;align-items:center;gap:9px}
+  .cm-hero-cap img{width:34px;height:23px;object-fit:cover;border-radius:3px;box-shadow:0 1px 5px #0006}
+  .cm-hero-cap b{color:#fff;font-family:var(--font-display);font-size:21px;text-shadow:0 1px 8px #0009;line-height:1.05}
+  .cm-body{padding:16px 18px 20px;overflow-y:auto}
+  .cm-sub{color:var(--muted);font-size:12.5px;margin:-2px 0 12px;display:flex;flex-wrap:wrap;gap:5px 10px}
+  .cm-sub .mtag{display:inline-flex;align-items:center;gap:5px}
+  .cm-desc{font-size:13.5px;line-height:1.5;margin:0 0 14px}
+  .cm-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .cm-facts div{background:var(--field);border:1px solid var(--rule);border-radius:11px;padding:9px 11px}
+  .cm-facts b{display:block;font-size:14.5px;font-weight:700;line-height:1.2;margin-bottom:2px}
+  .cm-facts span{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .cm-fun{background:color-mix(in srgb,var(--accent) 12%,var(--paper));border:1px solid var(--rule);border-radius:12px;padding:11px 13px;font-size:13px;margin-bottom:14px}
+  .cm-fun b{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
+  .cm-sites{font-size:13px;margin-bottom:14px}
+  .cm-sites .chiprow{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .cm-sites .schip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--rule);border-radius:14px;padding:4px 10px;font-size:12px;background:var(--field)}
+  .cm-actions{display:flex;gap:8px;margin-bottom:12px}
+  .cm-actions .btn{flex:1;justify-content:center}
+  .cm-credits{font-size:10px;line-height:1.6;color:var(--muted);opacity:.8;border-top:1px solid var(--rule);padding-top:9px}
+  .cm-credits a{color:var(--muted);text-decoration:underline}
+  /* fullscreen image lightbox */
+  #cm-light{position:fixed;inset:0;z-index:140;background:#000c;display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:18px}
+  #cm-light.open{display:flex;animation:fade .12s}
+  #cm-light img{max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 10px 50px #000a}
+  /* shared read-only passport */
+  #shared-view{position:fixed;inset:0;z-index:130;background:var(--ocean);display:none;overflow-y:auto;padding:32px 20px}
+  #shared-view.open{display:block}
+  .shared-card{max-width:420px;margin:0 auto;background:var(--paper);border:1px solid var(--rule);border-radius:18px;padding:24px;text-align:center}
+  .shared-card .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase}
+  .row .aprm{cursor:pointer;color:var(--accent);font-weight:700;margin-left:8px;flex:none}
+  /* badge earn popup */
+  #badge-pop{position:fixed;inset:0;z-index:120;background:#1e1b16ee;display:none;align-items:center;justify-content:center;padding:24px;overflow:hidden}
+  #badge-pop.show{display:flex;animation:fade .2s ease}
+  .badge-pop-card{position:relative;text-align:center;max-width:320px;z-index:2}
+  .badge-pop-card .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+  .pop-badge{margin:10px auto}
+  .pop-badge .badge-emblem{width:124px;height:124px;animation:pop .4s cubic-bezier(.2,1.4,.4,1)}
+  .pop-badge .badge-n{font-size:42px}
+  .pop-badge .badge-name{display:none}
+  @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+  .shape-diamond.pop-badge .badge-emblem{animation:popd .4s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes popd{from{transform:rotate(45deg) scale(.3);opacity:0}to{transform:rotate(45deg) scale(1);opacity:1}}
+  #pop-name{font-family:var(--font-display);font-size:24px;margin:16px 0 6px;color:#f6efe0}
+  #pop-desc{font-size:14px;color:#e6dfd0;line-height:1.5}
+  .pop-actions{margin-top:20px;display:flex;gap:10px;justify-content:center}
+  #confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+  #confetti i{position:absolute;top:-14px;width:9px;height:14px;border-radius:2px;animation:confetti linear forwards}
+  @keyframes confetti{to{transform:translateY(115vh) rotate(900deg)}}
   .addbtn{margin-top:10px;width:100%;justify-content:center}
 
   /* ---------- theme picker ---------- */
@@ -392,6 +576,14 @@
   .lchip.sel{box-shadow:inset 0 0 0 2px var(--accent);border-color:var(--accent)}
   .lchip .sw{width:13px;height:13px;border-radius:50%;box-shadow:0 0 0 1px #0002}
   .lchip .sw.wish{background:repeating-linear-gradient(45deg,var(--gold),var(--gold) 2px,#fff0 2px,#fff0 4px);border:1px dashed var(--gold)}
+  .visit-row{border:1px solid var(--rule);border-radius:14px;padding:11px 12px 12px;margin-bottom:10px;background:color-mix(in srgb,var(--field) 55%,transparent)}
+  .visit-row .lchips{margin-bottom:9px}
+  .visit-row .lchip{padding:6px 11px;font-size:12.5px}
+  .visit-when{display:flex;align-items:center;gap:10px}
+  .visit-when .visit-year{flex:1;border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:10px;padding:8px 11px;font:inherit;font-size:14px}
+  .visit-when .visit-year:focus{outline:none;border-color:var(--accent)}
+  .visit-rm{color:var(--muted);cursor:pointer;font-size:15px;padding:4px 6px;flex:none}
+  .visit-rm:hover{color:var(--accent)}
   #detail textarea{width:100%;border:1px solid var(--rule);background:var(--field);border-radius:8px;padding:10px 12px;
     font:inherit;font-size:13px;resize:vertical;min-height:62px}
   .detail-actions{display:flex;gap:10px;margin-top:16px}
@@ -402,7 +594,7 @@
 <body>
 <div id="app">
   <header>
-    <div class="brand">Wanderlines<small>✦ places i've been ✦</small></div>
+    <div class="brand" id="brand" title="Home — World Map" style="cursor:pointer">Wanderlines<small>✦ places i've been ✦</small></div>
     <div class="hdr-right">
       <div class="helpbtn" id="helpbtn" title="Help & tour">?</div>
       <div class="navbtn" id="navbtn"><span></span><span></span><span></span></div>
@@ -411,7 +603,9 @@
       <div class="nav-item active" data-view="world"><div class="ic" data-icon="world" data-isz="20"></div><div class="tx">World Map<small>scratch off countries</small></div></div>
       <div class="nav-item" data-view="journeys"><div class="ic" data-icon="compass" data-isz="20"></div><div class="tx">Journeys<small>routes you've travelled</small></div></div>
       <div class="nav-item" data-view="regions"><div class="ic" data-icon="pin" data-isz="20"></div><div class="tx">Regions<small>states &amp; provinces</small></div></div>
+      <div class="nav-item" data-view="timeline"><div class="ic" data-icon="calendar" data-isz="20"></div><div class="tx">Timeline<small>when you went where</small></div></div>
       <div class="nav-item" data-view="lists"><div class="ic" data-icon="list" data-isz="20"></div><div class="tx">Lists<small>by year · visited · wishlist</small></div></div>
+      <div class="nav-item" data-view="explore"><div class="ic" data-icon="world" data-isz="20"></div><div class="tx">Explore<small>every country, up close</small></div></div>
       <div class="nav-item" data-view="account"><div class="ic" data-icon="person" data-isz="20"></div><div class="tx">Account<small>profile &amp; stats</small></div></div>
     </nav>
   </header>
@@ -426,15 +620,8 @@
           <input id="search-in" placeholder="Find a country…" autocomplete="off"/>
           <div id="search-res" class="sres"></div>
         </div>
-        <button class="ctlbtn" id="layers-btn" data-icon="pin" data-isz="18" title="Landmarks"></button>
       </div>
-      <div id="layers-menu">
-        <h3>Landmarks</h3>
-        <label class="lyr"><input type="checkbox" id="lyr-parks"/><span class="d parks"></span>U.S. National Parks</label>
-        <label class="lyr"><input type="checkbox" id="lyr-unesco"/><span class="d unesco"></span>UNESCO World Heritage</label>
-        <p class="lyr-note">Off by default. Turn a layer on to drop pins you can tap to log — your country map stays clean.</p>
-      </div>
-      <div class="fab" id="paint-fab"><span class="dot" id="paint-dot"></span><span id="paint-label">Visited</span></div>
+      <div class="fab" id="paint-fab" title="Key — year & overlays"><span class="dot" id="paint-dot"></span><span id="paint-label">Visited</span></div>
       <div class="fab" id="share-fab" title="Share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><line x1="8.3" y1="10.8" x2="15.7" y2="6.2"/><line x1="8.3" y1="13.2" x2="15.7" y2="17.8"/></svg>
       </div>
@@ -448,7 +635,10 @@
       <div class="page">
         <h2>Journeys</h2>
         <p class="lead">Every trip you've already taken — its countries, in the order you travelled them.</p>
-        <button class="btn primary" id="new-journey-btn" style="width:100%;justify-content:center;margin-bottom:14px">+ New journey</button>
+        <div class="jbtns">
+          <button class="btn primary" id="new-journey-btn">+ New journey</button>
+          <button class="btn" id="all-routes-btn">Show all on map</button>
+        </div>
         <div id="journeys-list"></div>
       </div>
     </section>
@@ -492,6 +682,7 @@
       <div class="fab" id="share-fab2" title="Share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><line x1="8.3" y1="10.8" x2="15.7" y2="6.2"/><line x1="8.3" y1="13.2" x2="15.7" y2="17.8"/></svg>
       </div>
+      <div id="region-territories"></div>
       <div id="tip2"></div>
     </section>
 
@@ -506,9 +697,42 @@
           <input type="color" id="newlist-color" value="#7a5ea8"/>
           <button class="btn primary" id="addlist-btn">Add</button>
         </div>
+        <h2 style="margin-top:24px">Continents</h2>
+        <p class="lead">How much of each continent you've touched.</p>
+        <div class="card" id="continents-card"></div>
+        <h2 style="margin-top:24px">Airports</h2>
+        <p class="lead">Airports you've flown through — searchable, not on the map.</p>
+        <div class="card" id="airports-card"></div>
+        <h2 style="margin-top:24px">Landmarks</h2>
+        <p class="lead">National Parks &amp; UNESCO sites you've logged on the map.</p>
+        <div id="landmark-lists"></div>
         <h2 style="margin-top:24px">By Year</h2>
         <p class="lead">Your visited countries, grouped automatically.</p>
         <div class="card" id="byyear-card"></div>
+      </div>
+    </section>
+
+    <!-- TIMELINE -->
+    <section class="view hidden" id="view-timeline">
+      <div class="page">
+        <div class="tl-top">
+          <div><h2 style="margin:0">Timeline</h2><p class="lead" style="margin:0">When you went where · pinch to zoom</p></div>
+          <div class="tl-zoom"><button id="tl-minus" title="Less detail">−</button><span id="tl-level">Countries</span><button id="tl-plus" title="More detail">+</button></div>
+        </div>
+        <div id="timeline-body"></div>
+      </div>
+    </section>
+
+    <!-- EXPLORE -->
+    <section class="view hidden" id="view-explore">
+      <div class="page">
+        <h2 style="margin:0 0 2px">Explore</h2>
+        <p class="lead" style="margin:0 0 12px">Every country, up close — tap one to dive in.</p>
+        <div class="searchbox" style="position:relative;margin-bottom:14px">
+          <span class="si" data-icon="search" data-isz="15"></span>
+          <input id="ex-search" placeholder="Search a country…" autocomplete="off" style="padding-left:33px"/>
+        </div>
+        <div id="explore-grid"></div>
       </div>
     </section>
 
@@ -530,8 +754,32 @@
             <button data-u="km">Kilometres</button>
           </div>
         </div>
+        <div class="card">
+          <h2 style="margin:0 0 4px">Country names</h2>
+          <p class="lead" style="margin:0 0 10px">Show places in English or their native name.</p>
+          <div class="seg" id="names-seg">
+            <button data-nn="0">Device language</button>
+            <button data-nn="1">Native</button>
+          </div>
+        </div>
         <div class="stats" id="account-stats"></div>
         <div id="account-landmarks"></div>
+        <details class="iti-card acc" id="badges-acc" style="margin-top:12px"><summary data-t="badges">Passport</summary><div class="acc-body"><div id="badges-grid"></div>
+          <div class="share-btns" style="margin-top:14px">
+            <button class="btn primary addbtn" id="share-card-btn">Share card</button>
+            <button class="btn addbtn" id="livemap-btn">Live map</button>
+            <button class="btn addbtn" id="share-passport-btn">Share link (QR)</button>
+          </div></div></details>
+        <div class="card" style="margin-top:14px">
+          <h2 style="margin:0 0 4px">Backup &amp; export</h2>
+          <p class="lead" style="margin:0 0 10px">Your travels live on this device. Save a backup file you can keep or move to another device.</p>
+          <div class="share-btns">
+            <button class="btn primary addbtn" id="export-btn">Export backup</button>
+            <button class="btn addbtn" id="import-btn">Import backup</button>
+          </div>
+          <input type="file" id="import-file" accept="application/json,.json" style="display:none"/>
+          <div id="backup-msg" class="lead" style="margin:10px 0 0;display:none"></div>
+        </div>
         <div class="card" style="margin-top:14px">
           <div class="field"><label>Email</label><input type="email" id="acct-email" value=""/></div>
           <div class="field"><label>Password</label><input type="password" value="••••••••"/></div>
@@ -565,9 +813,9 @@
 <div id="detail">
   <div class="detail-card">
     <div class="dh"><h3 id="detail-title">Place</h3><span class="x" id="detail-x">✕</span></div>
-    <div class="dsub">Tap a color · set the year · add a note</div>
-    <div class="lchips" id="detail-lists"></div>
-    <div class="field"><label>Year visited</label><input type="number" id="detail-year" min="1900" max="2100"/></div>
+    <div class="dsub">Add each visit — its list &amp; year · jot a note</div>
+    <div id="detail-visits"></div>
+    <button class="btn addbtn" id="detail-add-visit" style="margin:2px 0 14px">+ Add another date / list</button>
     <div class="field"><label>Notes</label><textarea id="detail-notes" placeholder="A memory, who you went with, somewhere to go back to…"></textarea></div>
     <div class="detail-actions">
       <button class="btn danger" id="detail-remove">Remove</button>
@@ -601,18 +849,82 @@
   </div>
 </div>
 
+<!-- ---------- passport QR share ---------- -->
+<div id="qr-modal">
+  <div class="detail-card" style="max-width:340px;text-align:center">
+    <div class="dh"><h3 style="margin:0">Share your passport</h3><span class="x" id="qr-x">✕</span></div>
+    <p class="lead" style="margin:0 0 14px">A friend can scan this to see a read-only snapshot of your stamps & stats.</p>
+    <div id="qr-box"></div>
+    <button class="btn" id="qr-copy" style="margin-top:14px;width:100%;justify-content:center">Copy link</button>
+  </div>
+</div>
+
+<!-- ---------- passport share card ---------- -->
+<div id="card-modal">
+  <div class="detail-card" style="max-width:380px;text-align:center">
+    <div class="dh"><h3 style="margin:0">Your passport card</h3><span class="x" id="card-x">✕</span></div>
+    <p class="lead" style="margin:0 0 12px">A snapshot of your travels — save it or share it anywhere.</p>
+    <div id="card-preview"><div class="lead" style="margin:0">Drawing your card…</div></div>
+    <div class="share-btns" style="margin-top:14px">
+      <button class="btn primary addbtn" id="card-download">Download</button>
+      <button class="btn addbtn" id="card-share" style="display:none">Share…</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- live map (Leaflet) + share faces ---------- -->
+<div id="livemap-modal">
+  <div class="detail-card">
+    <div class="dh"><h3 style="margin:0">Your travel map</h3><span class="x" id="livemap-x">✕</span></div>
+    <p class="lead" style="margin:0 0 10px">Every place you've been, on a real map. Swap its face, then share the view.</p>
+    <div id="livemap"></div>
+    <div class="face-row" id="face-row"></div>
+    <div class="face-cred" id="face-cred"></div>
+  </div>
+</div>
+
+<!-- ---------- country detail (Explore) ---------- -->
+<div id="country-modal">
+  <div class="detail-card cm-card">
+    <div class="cm-hero" id="cm-hero"><span class="x" id="cm-x">✕</span><div class="cm-hero-grad"></div><div class="cm-hero-cap" id="cm-flagcap"></div></div>
+    <div class="cm-body" id="cm-body"></div>
+  </div>
+</div>
+
+<div id="cm-light"><img id="cm-light-img" alt=""/></div>
+
+<!-- ---------- shared read-only passport ---------- -->
+<div id="shared-view"></div>
+
+<!-- ---------- badge earned popup ---------- -->
+<div id="badge-pop">
+  <div id="confetti"></div>
+  <div class="badge-pop-card">
+    <div class="eyebrow">Badge earned!</div>
+    <div class="badge earned pop-badge"><div class="badge-emblem"><span class="badge-ico"></span><span class="badge-n"></span></div></div>
+    <div id="pop-name">Badge</div>
+    <div id="pop-desc"></div>
+    <div class="pop-actions">
+      <button class="btn primary" id="pop-share">Share</button>
+      <button class="btn" id="pop-close" style="background:#ffffff22;border-color:#ffffff44;color:#f6efe0">Nice!</button>
+    </div>
+  </div>
+</div>
+
 <!-- ---------- help tour overlay ---------- -->
 <div id="help">
   <div class="help-card">
     <h2>How it works</h2>
     <div class="hsub">Wanderlines</div>
-    <div class="help-row"><div class="hic" data-icon="tap"></div><div class="ht"><b>Tap a country</b><small>Its name pops up and the color cycles: Lived → Visited → Wish List → clear.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="tap"></div><div class="ht"><b>Tap a country</b><small>Its name pops up and the colour cycles: Visited → Lived → Wish List → clear.</small></div></div>
     <div class="help-row"><div class="hic" data-icon="hold"></div><div class="ht"><b>Press &amp; hold</b><small>Opens details — change the list, set the year, add notes.</small></div></div>
-    <div class="help-row"><div class="hic" data-icon="search"></div><div class="ht"><b>Search</b><small>Find a country (or a state/province inside a region) and jump to it.</small></div></div>
-    <div class="help-row"><div class="hic" data-icon="pin"></div><div class="ht"><b>Landmarks</b><small>Switch on National Parks or UNESCO pins — tap to mark Visited or Wish List.</small></div></div>
-    <div class="help-row"><div class="hic" data-icon="compass"></div><div class="ht"><b>Journeys</b><small>Every trip you've taken, replayed as a route on the map.</small></div></div>
-    <div class="help-row"><div class="hic" data-icon="calendar"></div><div class="ht"><b>Year</b><small>Bottom-left chip sets the year new taps are logged under.</small></div></div>
-    <div class="help-row"><div class="hic" data-icon="menu"></div><div class="ht"><b>Menu</b><small>Switch screens: Map, Journeys, Regions, Lists, Account.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="search"></div><div class="ht"><b>Search</b><small>Find a country, state/province, National Park, UNESCO site or airport and jump to it.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="calendar"></div><div class="ht"><b>Key</b><small>Bottom-left chip: set the year for new taps and toggle overlays — Parks, UNESCO, My Journeys.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="compass"></div><div class="ht"><b>Journeys</b><small>Log a trip — its stops, who came, a journal with photos — and replay its route on the map.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="pin"></div><div class="ht"><b>Regions</b><small>Scratch off states &amp; provinces (incl. U.S. territories) inside many countries.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="calendar"></div><div class="ht"><b>Timeline</b><small>See when you went where, by year. Pinch to add cities &amp; landmarks.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="person"></div><div class="ht"><b>Passport &amp; vibes</b><small>Account holds your stamps, flags &amp; badges, 6 vibes, miles/km, and native names.</small></div></div>
+    <div class="help-row"><div class="hic" data-icon="menu"></div><div class="ht"><b>Menu</b><small>Switch screens — and tap the logo any time to come home.</small></div></div>
     <button class="btn primary help-done" id="help-done">Got it</button>
     <div class="help-tip">…or tap anywhere to close</div>
   </div>
@@ -633,26 +945,32 @@ const state = {
   regionMarks: {},  // 'US' -> { stateId: {listId, year} }
   layers: { parks:false, unesco:false },   // landmark layers — OFF by default
   places: {},       // 'parks:Yosemite' -> {visited:true, year}
+  extraUnesco: [],  // UNESCO sites found via search (beyond the 64 pinned), kept as pins
   tracking: 'manual',   // 'manual' | 'auto'(soon) — set under Account
   theme: 'retro',       // one of 6 token-driven vibes
   units: 'mi',          // 'mi' (default) | 'km' — set under Account
-  activeRoute: null,    // journey currently drawn on the world map
+  nativeNames: false,   // show countries in their native name vs device language
+  airports: {},         // 'JFK' -> {name, city, country, lat, lon, year}
+  timelineZoom: 1,      // 1 countries · 2 +landmarks · 3 +cities
+  activeRoute: null,    // single journey drawn on the world map
+  allRoutes: false,     // show every journey's route at once (big numbered pins)
+  journeyOverlay: false,// Key toggle: all journeys as faint lines + small dots
   journeys: [
-    { id:'j1', name:'Southeast Asia', start:'2024-02-03', end:'2024-02-24', modes:['plane','train','boat'],
-      travelers:[{name:'You',age:'29',avatar:0},{name:'Sam',age:'31',avatar:1}],
-      review:{rating:5,returnq:'yes',highlight:'Angkor Wat at sunrise',eats:'Mango sticky rice off a Bangkok cart',stay:'Riverside guesthouse in Hoi An — yes'},
-      remember:['Book Angkor tickets the night before','Pack lighter — laundry is cheap everywhere','Halong Bay midweek to dodge the crowds'],
-      stops:[ {name:'Bangkok',lon:100.5,lat:13.76,kind:'city',notes:'Street food crawl; Grand Palace.'},
-              {name:'Angkor Wat',lon:103.87,lat:13.41,kind:'unesco',notes:'Up at 4am for sunrise — worth it.'},
-              {name:'Vietnam',lon:108.28,lat:14.06,kind:'country',notes:'Halong Bay cruise.'} ],
-      journal:[{date:'2024-02-05',text:'Got lost in Bangkok’s night markets and found the best mango sticky rice of my life. Sam haggled for a hat.'},
-               {date:'2024-02-12',text:'Sunrise at Angkor Wat. No words — just the silhouettes and the reflecting pool. Cried a little.'}] },
-    { id:'j2', name:'Andes Adventure', start:'2023-09-10', end:'2023-09-28', modes:['car','walking'],
-      travelers:[{name:'You',age:'29',avatar:0}],
-      review:{rating:4,returnq:'maybe',highlight:'Machu Picchu trek',eats:'Lomo saltado in Cusco',stay:''},
-      remember:['Acclimatise in Cusco 2+ days before the trek'],
-      stops:[ {name:'Cusco',lon:-71.97,lat:-13.53,kind:'city',notes:''}, {name:'Machu Picchu',lon:-72.55,lat:-13.16,kind:'unesco',notes:'The classic Inca Trail.'}, {name:'Chile',lon:-71.54,lat:-35.68,kind:'country',notes:''} ],
-      journal:[] },
+    { id:'jx', name:'Example Journey', start:'2024-11-02', end:'2024-11-19', modes:['plane','bus','car','boat'],
+      travelers:[{name:'You',age:'30',avatar:0},{name:'Maya',age:'29',avatar:2}],
+      review:{rating:5,returnq:'yes',highlight:'Sunrise over Tikal’s temples above the jungle canopy',eats:'Gallo pinto, and the freshest ceviche on the Pacific coast',stay:'Eco-lodge by Arenal — would go back in a heartbeat'},
+      remember:['Book the Tikal sunrise tour a few days ahead','Bring a rain jacket — Costa Rica is green for a reason','Small USD bills are handy almost everywhere','Delete this Example Journey whenever you’re ready'],
+      stops:[ {name:'Guatemala',lon:-90.36,lat:15.78,kind:'country',notes:'Flew into Guatemala City, headed straight north.'},
+              {name:'Tikal',lon:-89.62,lat:17.22,kind:'unesco',notes:'Mayan temples rising out of the rainforest.'},
+              {name:'Antigua Guatemala',lon:-90.73,lat:14.56,kind:'city',notes:'Cobblestones, the Santa Catalina arch, volcano views.'},
+              {name:'Granada, Nicaragua',lon:-85.96,lat:11.93,kind:'city',notes:'Colourful colonial streets on Lake Nicaragua.'},
+              {name:'Arenal Volcano',lon:-84.70,lat:10.46,kind:'park',notes:'Hot springs after a long hike; perfect cone at dusk.'},
+              {name:'Panama City',lon:-79.52,lat:8.98,kind:'city',notes:'Casco Viejo old town + skyline.'},
+              {name:'Panama Canal',lon:-79.68,lat:9.12,kind:'water',notes:'Watched a container ship rise through the locks.'} ],
+      journal:[
+        {date:'2024-11-04',text:'Wandered Antigua’s cobblestone streets under the Santa Catalina arch, Agua volcano framed perfectly behind it. Best tamales of the trip from a tiny street cart. (This is an Example Journey — edit or delete it anytime!)',photo:'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Antigua_-_Arco.jpg/3840px-Antigua_-_Arco.jpg'},
+        {date:'2024-11-06',text:'Up at 4am to climb Temple IV at Tikal for sunrise. Howler monkeys roaring in the dark, then the jungle lit up gold and the temples broke through the mist. Unreal.',photo:'https://upload.wikimedia.org/wikipedia/commons/7/75/Tikal_3.jpg'},
+        {date:'2024-11-13',text:'Arenal showed off at dusk — a flawless cone, then hot springs to soak the hiking out of our legs. This is the one I’d come back for.',photo:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Arenal_volcano_%2870785p%29_%28cropped%29.jpg/3840px-Arenal_volcano_%2870785p%29_%28cropped%29.jpg'} ] },
   ],
 };
 const SEED = {'840':['lived',2015],'124':['visited',2019],'076':['visited',2023],
@@ -660,9 +978,17 @@ const SEED = {'840':['lived',2015],'124':['visited',2019],'076':['visited',2023]
   '356':['wishlist',2026],'036':['wishlist',2026],'152':['lived',2020],'484':['visited',2018]};
 Object.entries(SEED).forEach(([k,v])=>state.marks[k]={listId:v[0],year:v[1]});
 
+// hover-to-name is for real pointers only; on touch we use tap-to-reveal instead
+const HOVER = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
 const listById = id => state.lists.find(l=>l.id===id);
 const colorFor = mark => { if(!mark) return null; const l=listById(mark.listId); return l && !l.wish ? l.color : null; };
 const isWish   = mark => { const l=mark&&listById(mark.listId); return !!(l&&l.wish); };
+// ----- multi-visit model: a location can hold several {listId,year} visits; listId/year mirror the "primary" one -----
+function visitsOf(m){ if(!m) return []; if(Array.isArray(m.visits)&&m.visits.length) return m.visits; return [{listId:m.listId, year:m.year}]; }
+function listRank(id){ const l=listById(id); if(!l) return 1; if(l.wish) return 0; if(l.id==='lived') return 3; return 2; }
+function primaryVisit(m){ const vs=visitsOf(m); if(!vs.length) return null;
+  return vs.slice().sort((a,b)=>{ const r=listRank(b.listId)-listRank(a.listId); return r||((+b.year||0)-(+a.year||0)); })[0]; }
+function syncPrimary(m){ if(!m) return m; const p=primaryVisit(m); if(p){ m.listId=p.listId; m.year=p.year; } return m; }
 
 // ---------------- tap vs long-press ----------------
 let lpTimer=null, lpFired=false, lpSx=0, lpSy=0, lpMoved=false;
@@ -676,21 +1002,30 @@ document.addEventListener('contextmenu',e=>{ if(e.target.closest('svg.map')) e.p
 // ---------------- detail editor (long-press) ----------------
 let detailCtx=null, detailSel=null;
 const D=id=>document.getElementById(id);
+let draftVisits=[];
 function openDetail(ctx){
   detailCtx=ctx; const m=ctx.get();
-  detailSel = m ? m.listId : state.lists[0].id;
+  draftVisits = m ? visitsOf(m).map(v=>({listId:v.listId||'visited', year:+v.year||state.year})) : [{listId:state.active||'visited', year:state.year}];
   D('detail-title').textContent=ctx.name||'Place';
-  D('detail-year').value = m ? m.year : state.year;
   D('detail-notes').value = m ? (m.notes||'') : '';
   D('detail-remove').style.display = m ? '' : 'none';
-  renderDetailLists();
+  renderDetailVisits();
   D('detail').classList.add('open');
 }
-function renderDetailLists(){
-  D('detail-lists').innerHTML = state.lists.map(l=>
-    `<div class="lchip ${l.id===detailSel?'sel':''}" data-id="${l.id}">
-      <span class="sw ${l.wish?'wish':''}" style="${l.wish?'':'background:'+l.color}"></span>${l.name}</div>`).join('');
-  D('detail-lists').querySelectorAll('.lchip').forEach(c=>c.onclick=()=>{ detailSel=c.dataset.id; renderDetailLists(); });
+function renderDetailVisits(){
+  const box=D('detail-visits');
+  box.innerHTML = draftVisits.map((v,i)=>`
+    <div class="visit-row" data-i="${i}">
+      <div class="lchips">${state.lists.map(l=>
+        `<div class="lchip ${l.id===v.listId?'sel':''}" data-li="${l.id}"><span class="sw ${l.wish?'wish':''}" style="${l.wish?'':'background:'+l.color}"></span>${l.name}</div>`).join('')}</div>
+      <div class="visit-when"><input type="number" class="visit-year" min="1900" max="2100" value="${v.year}" placeholder="Year"/>
+        ${draftVisits.length>1?`<span class="visit-rm" title="Remove this date">✕</span>`:''}</div>
+    </div>`).join('');
+  box.querySelectorAll('.visit-row').forEach(row=>{ const i=+row.dataset.i;
+    row.querySelectorAll('.lchip').forEach(c=>c.onclick=()=>{ draftVisits[i].listId=c.dataset.li; renderDetailVisits(); });
+    const yr=row.querySelector('.visit-year'); yr.oninput=()=>{ draftVisits[i].year=+yr.value||state.year; };
+    const rm=row.querySelector('.visit-rm'); if(rm) rm.onclick=()=>{ draftVisits.splice(i,1); renderDetailVisits(); };
+  });
 }
 function closeDetail(){ D('detail').classList.remove('open'); detailCtx=null; }
 function openCountryDetail(d){ openDetail({ name:d.properties.name,
@@ -703,14 +1038,19 @@ function openRegionDetail(d){ const code=curRegion.code, k=curRegion.keyFn(d); o
   repaint:paintRegion }); }
 D('detail-x').onclick=closeDetail;
 D('detail').onclick=e=>{ if(e.target.id==='detail') closeDetail(); };
+D('detail-add-visit').onclick=()=>{ const last=draftVisits[draftVisits.length-1];
+  draftVisits.push({listId:(last&&last.listId)||'visited', year:(last&&+last.year? +last.year+1 : state.year)}); renderDetailVisits(); };
 D('detail-save').onclick=()=>{ if(!detailCtx)return;
-  detailCtx.set({ listId:detailSel, year:+D('detail-year').value||state.year, notes:D('detail-notes').value.trim() });
+  const visits=draftVisits.map(v=>({listId:v.listId, year:+v.year||state.year})).filter(v=>v.listId);
+  if(!visits.length){ detailCtx.set(null); }
+  else { const m={ visits, notes:D('detail-notes').value.trim() }; syncPrimary(m); detailCtx.set(m); }
   detailCtx.repaint(); closeDetail(); };
 D('detail-remove').onclick=()=>{ if(!detailCtx)return; detailCtx.set(null); detailCtx.repaint(); closeDetail(); };
 
 // ---------------- help tour ----------------
 D('helpbtn').onclick=e=>{ e.stopPropagation(); D('help').classList.add('open'); };
 D('help').onclick=()=>D('help').classList.remove('open');
+D('brand').onclick=()=>{ if(typeof clearRoute==='function') clearRoute(); go('world'); };
 
 // ---------------- nav ----------------
 const navbtn=document.getElementById('navbtn'), nav=document.getElementById('nav');
@@ -727,8 +1067,10 @@ function go(view){
   if(view==='journeys'){ renderJourneys(); }
   if(view==='itinerary'){ renderItinerary(); }
   if(view==='regions'){ renderRegions(); }
-  if(view==='lists'){ renderLists(); renderByYear(); }
-  if(view==='account'){ renderAccount(); buildThemeGrid(); renderUnits(); }
+  if(view==='lists'){ renderLists(); renderContinents(); renderAirports(); renderLandmarkLists(); renderByYear(); }
+  if(view==='timeline'){ renderTimeline(); }
+  if(view==='explore'){ renderExplore(); }
+  if(view==='account'){ renderAccount(); buildThemeGrid(); renderUnits(); renderNames(); }
 }
 
 // ---------------- world map ----------------
@@ -756,8 +1098,8 @@ function drawWorld(){
   wSphere.append('path').attr('class','graticule').datum(d3.geoGraticule10()).attr('d',wpath);
   wsel=wLand.selectAll('path').data(wfeats).join('path').attr('class','country').attr('d',wpath)
     .on('pointerdown',(e,d)=>lpDown(e,()=>openCountryDetail(d)))
-    .on('pointermove',(e,d)=>{ lpMove(e); showTip(tip,'view-world',e,d.properties.name,state.marks[d.id]); })
-    .on('pointerup',(e,d)=>lpUp(()=>{ cycleCountry(d); flashTip(tip,'view-world',e,d.properties.name,state.marks[d.id]); }))
+    .on('pointermove',(e,d)=>{ lpMove(e); if(HOVER) showTip(tip,'view-world',e,displayName(d.id),state.marks[d.id]); })
+    .on('pointerup',(e,d)=>lpUp(()=>{ cycleCountry(d); flashTip(tip,'view-world',e,displayName(d.id),state.marks[d.id]); }))
     .on('pointercancel',lpCancel)
     .on('pointerleave',()=>{ tip.style.opacity=0; lpCancel(); });
   paintWorld();
@@ -771,53 +1113,108 @@ function drawWorld(){
       wMarks.attr('transform',e.transform); wRoute.attr('transform',e.transform);
       wLand.selectAll('path').attr('stroke-width',d=>(state.marks[d.id]&&isWish(state.marks[d.id])?0.9:0.18)/wk);
       wMarks.selectAll('circle').attr('r',5/wk);
-      if(state.activeRoute) renderRoute();
+      if(state.activeRoute||state.allRoutes||state.journeyOverlay) renderRoute();
     });
   wsvg.call(worldZoom).on('dblclick.zoom',null);
   worldReady=true;
 }
 // ---------------- journeys: route drawing ----------------
-function renderRoute(){
-  wRoute.selectAll('*').remove();
-  const j=state.activeRoute, banner=document.getElementById('route-banner');
-  banner.classList.toggle('show',!!j);
-  if(!j) return;
-  document.getElementById('route-name').textContent=j.name;
-  const coords=j.stops.map(s=>[s.lon,s.lat]);
-  if(coords.length>1) wRoute.append('path').attr('class','route-line')
-    .attr('d',wpath({type:'LineString',coordinates:coords})).attr('stroke-width',1.8/wk);
-  const g=wRoute.selectAll('g.rstop').data(j.stops).join('g').attr('class','rstop')
-    .attr('transform',s=>{const p=wproj([s.lon,s.lat]);return `translate(${p[0]},${p[1]})`;});
-  g.append('circle').attr('class','route-pin').attr('r',9/wk).attr('stroke-width',1.6/wk);
+const ROUTE_COLORS=['#df4d12','#0c8a6f','#7a5ea8','#d99421','#2f6f9f','#c2306e','#3a7d44','#1f8a8a'];
+const routeCurve=d3.line().curve(d3.curveCatmullRom.alpha(0.5)); // smooth the angles (not loopy)
+function drawOneRoute(j,color){
+  const pts=j.stops.map(s=>wproj([s.lon,s.lat]));
+  if(pts.length>1) wRoute.append('path').attr('class','route-line')
+    .attr('d',routeCurve(pts)).attr('stroke-width',2.4/wk).style('stroke',color);
+  const g=wRoute.append('g').selectAll('g').data(j.stops).join('g').attr('class','rstop')
+    .attr('transform',s=>{const p=wproj([s.lon,s.lat]);return `translate(${p[0]},${p[1]})`;})
+    .style('cursor','pointer')
+    .on('pointerdown',e=>e.stopPropagation())
+    .on('pointerup',(e,s)=>{ e.stopPropagation(); flashTip(tip,'view-world',e,s.name,null); });
+  g.append('circle').attr('class','route-pin').attr('r',9/wk).attr('stroke-width',1.6/wk).style('fill',color);
   g.append('text').attr('class','route-num').attr('text-anchor','middle').attr('dy',3.2/wk)
     .style('font-size',(10/wk)+'px').text((s,i)=>i+1);
 }
-function zoomToStops(j){
-  if(!worldZoom||!j.stops.length) return;
+// faint overlay version — small dots (distinctly smaller than landmark pins), no numbers
+function drawOverlayRoute(j,color){
+  const pts=j.stops.map(s=>wproj([s.lon,s.lat]));
+  if(pts.length>1) wRoute.append('path').attr('class','route-line route-faint').attr('d',routeCurve(pts)).attr('stroke-width',1.4/wk).style('stroke',color);
+  wRoute.append('g').selectAll('circle').data(j.stops).join('circle').attr('class','route-dot')
+    .attr('cx',s=>wproj([s.lon,s.lat])[0]).attr('cy',s=>wproj([s.lon,s.lat])[1]).attr('r',2.6/wk)
+    .attr('stroke-width',1/wk).style('fill',color)
+    .style('cursor','pointer').on('pointerdown',e=>e.stopPropagation())
+    .on('pointerup',(e,s)=>{ e.stopPropagation(); flashTip(tip,'view-world',e,s.name,null); });
+}
+function renderRoute(){
+  wRoute.selectAll('*').remove();
+  const banner=document.getElementById('route-banner');
+  if(state.allRoutes){
+    banner.classList.add('show'); document.getElementById('route-name').textContent='All journeys';
+    state.journeys.forEach((j,i)=>drawOneRoute(j,ROUTE_COLORS[i%ROUTE_COLORS.length]));
+    return;
+  }
+  const j=state.activeRoute;
+  if(!j && state.journeyOverlay){ banner.classList.remove('show');
+    state.journeys.forEach((jj,i)=>drawOverlayRoute(jj,ROUTE_COLORS[i%ROUTE_COLORS.length])); return; }
+  banner.classList.toggle('show',!!j);
+  if(!j) return;
+  document.getElementById('route-name').textContent=j.name;
+  drawOneRoute(j, getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#df4d12');
+}
+function fitRoutes(coords){
+  if(!worldZoom||!coords.length) return;
   const el=document.getElementById('world-svg'),W=el.clientWidth,H=el.clientHeight;
-  const [[x0,y0],[x1,y1]]=wpath.bounds({type:'LineString',coordinates:j.stops.map(s=>[s.lon,s.lat])});
+  const [[x0,y0],[x1,y1]]=wpath.bounds({type:'MultiPoint',coordinates:coords});
   const dx=Math.max(x1-x0,30),dy=Math.max(y1-y0,30),cx=(x0+x1)/2,cy=(y0+y1)/2;
   const k=Math.max(1,Math.min(7,0.62/Math.max(dx/W,dy/H)));
   wsvg.transition().duration(800).call(worldZoom.transform,d3.zoomIdentity.translate(W/2-k*cx,H/2-k*cy).scale(k));
 }
 function showRoute(j){
-  state.activeRoute=j; nav.classList.remove('open'); go('world');
-  const tryIt=()=>{ if(worldZoom&&wfeats){ renderRoute(); zoomToStops(j); } else requestAnimationFrame(tryIt); };
+  state.activeRoute=j; state.allRoutes=false; nav.classList.remove('open'); go('world');
+  const tryIt=()=>{ if(worldZoom&&wfeats){ renderRoute(); fitRoutes(j.stops.map(s=>[s.lon,s.lat])); } else requestAnimationFrame(tryIt); };
   requestAnimationFrame(tryIt);
 }
-function clearRoute(){ state.activeRoute=null; renderRoute(); }
+function showAllRoutes(){
+  state.allRoutes=true; state.activeRoute=null; nav.classList.remove('open'); go('world');
+  const tryIt=()=>{ if(worldZoom&&wfeats){ renderRoute(); fitRoutes(state.journeys.flatMap(j=>j.stops.map(s=>[s.lon,s.lat]))); } else requestAnimationFrame(tryIt); };
+  requestAnimationFrame(tryIt);
+}
+function clearRoute(){ state.activeRoute=null; state.allRoutes=false; renderRoute(); }
 // ---------------- landmark layers (opt-in) ----------------
 const LANDMARKS={
-  parks:[ // U.S. National Parks
-    ['Yellowstone',-110.5,44.6],['Yosemite',-119.54,37.85],['Grand Canyon',-112.11,36.06],['Zion',-113.03,37.30],
-    ['Glacier',-113.72,48.70],['Rocky Mountain',-105.68,40.34],['Great Smoky Mountains',-83.51,35.61],['Acadia',-68.25,44.35],
-    ['Olympic',-123.50,47.80],['Joshua Tree',-116.16,33.87],['Everglades',-80.93,25.29],['Grand Teton',-110.80,43.79],
-    ['Denali',-151.0,63.13],['Sequoia',-118.57,36.49] ],
-  unesco:[ // UNESCO World Heritage (a global starter set)
+  parks:[ // all 63 U.S. National Parks [name, lon, lat]
+    ['Acadia',-68.21,44.35],['American Samoa',-170.68,-14.26],['Arches',-109.57,38.73],['Badlands',-102.50,43.75],
+    ['Big Bend',-103.25,29.25],['Biscayne',-80.21,25.49],['Black Canyon of the Gunnison',-107.72,38.57],['Bryce Canyon',-112.17,37.57],
+    ['Canyonlands',-109.93,38.20],['Capitol Reef',-111.17,38.20],['Carlsbad Caverns',-104.44,32.17],['Channel Islands',-119.42,34.00],
+    ['Congaree',-80.78,33.78],['Crater Lake',-122.10,42.94],['Cuyahoga Valley',-81.55,41.26],['Death Valley',-116.92,36.51],
+    ['Denali',-151.00,63.13],['Dry Tortugas',-82.87,24.63],['Everglades',-80.93,25.29],['Gates of the Arctic',-153.30,67.78],
+    ['Gateway Arch',-90.18,38.63],['Glacier',-113.80,48.70],['Glacier Bay',-136.90,58.50],['Grand Canyon',-112.14,36.06],
+    ['Grand Teton',-110.80,43.79],['Great Basin',-114.26,38.98],['Great Sand Dunes',-105.51,37.79],['Great Smoky Mountains',-83.50,35.61],
+    ['Guadalupe Mountains',-104.86,31.92],['Haleakalā',-156.17,20.72],['Hawaiʻi Volcanoes',-155.29,19.42],['Hot Springs',-93.05,34.51],
+    ['Indiana Dunes',-87.05,41.65],['Isle Royale',-88.55,48.00],['Joshua Tree',-116.16,33.87],['Katmai',-155.00,58.50],
+    ['Kenai Fjords',-149.65,59.92],['Kings Canyon',-118.55,36.80],['Kobuk Valley',-159.28,67.55],['Lake Clark',-153.42,60.97],
+    ['Lassen Volcanic',-121.42,40.49],['Mammoth Cave',-86.10,37.18],['Mesa Verde',-108.46,37.18],['Mount Rainier',-121.76,46.85],
+    ['New River Gorge',-81.08,38.07],['North Cascades',-121.20,48.70],['Olympic',-123.50,47.80],['Petrified Forest',-109.79,35.07],
+    ['Pinnacles',-121.16,36.48],['Redwood',-124.00,41.30],['Rocky Mountain',-105.68,40.34],['Saguaro',-110.50,32.25],
+    ['Sequoia',-118.57,36.49],['Shenandoah',-78.35,38.53],['Theodore Roosevelt',-103.45,46.97],['Virgin Islands',-64.73,18.34],
+    ['Voyageurs',-92.83,48.50],['White Sands',-106.33,32.78],['Wind Cave',-103.48,43.57],['Wrangell–St. Elias',-142.00,61.00],
+    ['Yellowstone',-110.50,44.60],['Yosemite',-119.54,37.85],['Zion',-113.03,37.30] ],
+  unesco:[ // a broad worldwide selection of UNESCO World Heritage sites
     ['Great Wall of China',116.57,40.43],['Taj Mahal',78.04,27.17],['Machu Picchu',-72.55,-13.16],['Colosseum, Rome',12.49,41.89],
     ['Petra',35.44,30.33],['Angkor Wat',103.87,13.41],['Pyramids of Giza',31.13,29.98],['Statue of Liberty',-74.04,40.69],
-    ['Stonehenge',-1.83,51.18],['Acropolis, Athens',23.73,37.97],['Galápagos Islands',-90.5,-0.6],['Mont-Saint-Michel',-1.51,48.64],
-    ['Serengeti',34.83,-2.33],['Sydney Opera House',151.21,-33.86] ],
+    ['Stonehenge',-1.83,51.18],['Acropolis, Athens',23.73,37.97],['Galápagos Islands',-90.50,-0.60],['Mont-Saint-Michel',-1.51,48.64],
+    ['Serengeti',34.83,-2.33],['Sydney Opera House',151.21,-33.86],['Chichen Itza',-88.57,20.68],['Teotihuacan',-98.84,19.69],
+    ['Tikal',-89.62,17.22],['Historic Antigua Guatemala',-90.73,14.56],['Old Havana',-82.36,23.14],['Rapa Nui (Easter Island)',-109.35,-27.12],
+    ['Cusco',-71.97,-13.52],['Nazca Lines',-75.13,-14.70],['Iguazú Falls',-54.44,-25.69],['Rio de Janeiro',-43.21,-22.95],
+    ['Cartagena',-75.55,10.42],['Vatican City',12.45,41.90],['Historic Venice',12.34,45.44],['Florence Historic Centre',11.25,43.77],
+    ['Pompeii',14.49,40.75],['Alhambra, Granada',-3.59,37.18],['Sagrada Família, Barcelona',2.17,41.40],['Palace of Versailles',2.12,48.80],
+    ['Cologne Cathedral',6.96,50.94],['Westminster, London',-0.13,51.50],['Edinburgh Old & New Towns',-3.19,55.95],['Historic Bruges',3.22,51.21],
+    ['Kremlin & Red Square',37.62,55.75],['St Petersburg',30.32,59.94],['Hagia Sophia, Istanbul',28.98,41.01],['Göreme, Cappadocia',34.83,38.64],
+    ['Pamukkale',29.12,37.92],['Persepolis',52.89,29.94],['Bagan',94.86,21.17],['Borobudur',110.20,-7.61],
+    ['Historic Kyoto',135.77,35.01],['Himeji Castle',134.69,34.84],['Forbidden City, Beijing',116.39,39.92],['Terracotta Army, Xi’an',109.28,34.38],
+    ['Ha Long Bay',107.00,20.91],['Luang Prabang',102.14,19.89],['Ajanta Caves',75.70,20.55],['Hampi',76.47,15.34],
+    ['Sigiriya',80.76,7.96],['Abu Simbel',31.63,22.34],['Medina of Marrakesh',-7.99,31.63],['Medina of Fez',-4.97,34.06],
+    ['Timbuktu',-3.00,16.77],['Victoria Falls',25.86,-17.92],['Robben Island',18.37,-33.81],['Ngorongoro',35.50,-3.20],
+    ['Great Barrier Reef',146.50,-18.00],['Uluru-Kata Tjuta',131.04,-25.34],['Banff (Canadian Rockies)',-116.00,51.50],['Independence Hall',-75.15,39.95] ],
 };
 const pkey=(layer,name)=>layer+':'+name;
 // extra searchable stop data so journeys can be logged at any granularity (free, offline)
@@ -898,15 +1295,21 @@ function cyclePlace(d,e){
   renderMarks();
   const p=state.places[k], st=p?(p.listId==='visited'?'Visited · '+p.year:'Wish List'):'';
   flashTip(tip,'view-world',e,(d.layer==='parks'?ICON('park',15)+' ':ICON('unesco',15)+' ')+d.name+(st?' · '+st:''),null);
+  checkBadges(); saveState();
 }
 // Visited first (most common), then Lived, Wish List, any custom lists, then clear
 function cycleOrder(){ return ['visited', ...state.lists.filter(l=>l.id!=='visited').map(l=>l.id)]; }
 function cycleCountry(d){
   const order=cycleOrder(), cur=state.marks[d.id];
   if(!cur){ state.marks[d.id]={listId:'visited',year:state.year,notes:''}; }
+  else if(Array.isArray(cur.visits)&&cur.visits.length>1){ // multi-visit: cycle the primary, keep the rest
+    const p=primaryVisit(cur), nx=order[(order.indexOf(p.listId)+1)%order.length];
+    const t=cur.visits.find(v=>v.listId===p.listId&&v.year===p.year)||cur.visits[0]; t.listId=nx; syncPrimary(cur);
+  }
   else { const nx=order[order.indexOf(cur.listId)+1];
-    if(nx) cur.listId=nx; else delete state.marks[d.id]; }
-  paintWorld();
+    if(nx){ cur.listId=nx; if(Array.isArray(cur.visits)&&cur.visits.length===1) cur.visits[0].listId=nx; }
+    else delete state.marks[d.id]; }
+  paintWorld(); checkBadges(); saveState();
 }
 function paintWorld(){
   if(!wsel) return;
@@ -929,27 +1332,35 @@ function flashTip(tipEl,wrapId,e,name,mark){
   tipTimer=setTimeout(()=>{tipEl.style.opacity=0;},1900);
 }
 
-// ---------------- landmark layers wiring ----------------
-const layersBtn=document.getElementById('layers-btn'), layersMenu=document.getElementById('layers-menu');
-layersBtn.onclick=e=>{ e.stopPropagation(); layersMenu.classList.toggle('open'); };
-layersMenu.onclick=e=>e.stopPropagation();
-function setLayer(layer,on){ state.layers[layer]=on; renderMarks(); layersBtn.classList.toggle('on',state.layers.parks||state.layers.unesco); }
-document.getElementById('lyr-parks').onchange=e=>setLayer('parks',e.target.checked);
-document.getElementById('lyr-unesco').onchange=e=>setLayer('unesco',e.target.checked);
+// ---------------- overlays (toggled from the Key panel) ----------------
+function setLayer(layer,on){ state.layers[layer]=on; renderMarks(); }
 
 // ---------------- country search ----------------
 const searchIn=document.getElementById('search-in'), searchRes=document.getElementById('search-res');
 let searchHits=[];
+// the full ~1,000-site UNESCO list, lazy-loaded for search only (the map keeps the 64 pins)
+let UNESCO_FULL=null, unescoLoading=false;
+function loadUnescoFull(){
+  if(UNESCO_FULL||unescoLoading) return; unescoLoading=true;
+  fetch('https://cdn.jsdelivr.net/gh/Igor-Vladyka/realplanet@master/data/places/real.planet.unesco.json')
+    .then(r=>r.json()).then(d=>{ UNESCO_FULL=d.filter(x=>x.latitude&&x.longitude).map(x=>({name:x.name_en,lon:+x.longitude,lat:+x.latitude}));
+      if(searchIn.value.trim()) runSearch(); }).catch(()=>{ unescoLoading=false; });
+}
 function runSearch(){
   const q=searchIn.value.trim().toLowerCase();
   if(!q||!wfeats){ searchRes.classList.remove('open'); return; }
-  searchHits=wfeats.filter(f=>f.properties.name.toLowerCase().includes(q))
-    .sort((a,b)=>a.properties.name.localeCompare(b.properties.name)).slice(0,7);
-  if(!searchHits.length){ searchRes.innerHTML='<div class="none">No country found</div>'; searchRes.classList.add('open'); return; }
-  searchRes.innerHTML=searchHits.map((f,i)=>{
-    const m=state.marks[f.id], l=m&&listById(m.listId), rs=regionSetForCountry(f.id);
-    return `<div class="sr" data-i="${i}"><span class="srl">${f.properties.name}<small>${l?l.name+' · '+m.year:'not logged'}</small></span>`+
-      (rs?`<span class="rchip" data-region="${rs.code}">Regions ›</span>`:'')+`</div>`;
+  loadUnescoFull();
+  const countries=wfeats.filter(f=>f.properties.name.toLowerCase().includes(q)).map(f=>({type:'country',f,name:f.properties.name}));
+  const lms=[], useen=new Set();
+  LANDMARKS.parks.forEach(([name,lon,lat])=>{ if(name.toLowerCase().includes(q)) lms.push({type:'parks',name:name+' NP',lon,lat,layer:'parks'}); });
+  LANDMARKS.unesco.forEach(([name,lon,lat])=>{ if(name.toLowerCase().includes(q)){ useen.add(name.toLowerCase()); lms.push({type:'unesco',name,lon,lat,layer:'unesco'}); } });
+  if(UNESCO_FULL) UNESCO_FULL.forEach(s=>{ if(s.name.toLowerCase().includes(q)&&!useen.has(s.name.toLowerCase())) lms.push({type:'unesco',name:s.name,lon:s.lon,lat:s.lat,layer:'unesco'}); });
+  searchHits=[...countries,...lms].sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8);
+  if(!searchHits.length){ searchRes.innerHTML='<div class="none">Nothing found</div>'; searchRes.classList.add('open'); return; }
+  searchRes.innerHTML=searchHits.map((h,i)=>{
+    if(h.type==='country'){ const m=state.marks[h.f.id], l=m&&listById(m.listId), rs=regionSetForCountry(h.f.id);
+      return `<div class="sr" data-i="${i}"><span class="srl">${ICON('flag',14)} ${displayName(h.f.id)}<small>${l?l.name+' · '+m.year:'country'}</small></span>`+(rs?`<span class="rchip" data-region="${rs.code}">Regions ›</span>`:'')+`</div>`; }
+    return `<div class="sr" data-i="${i}"><span class="srl">${ICON(h.type==='parks'?'park':'unesco',14)} ${h.name}<small>${h.type==='parks'?'National Park':'UNESCO site'}</small></span></div>`;
   }).join('');
   searchRes.classList.add('open');
   searchRes.querySelectorAll('.sr').forEach(el=>el.onclick=()=>pickSearch(+el.dataset.i));
@@ -958,12 +1369,20 @@ function runSearch(){
     openRegion(REGION_SETS.find(r=>r.code===el.dataset.region)); });
 }
 function pickSearch(i){
-  const f=searchHits[i]; if(!f) return;
-  searchRes.classList.remove('open'); searchIn.value=f.properties.name; searchIn.blur();
-  zoomToCountry(f);
+  const h=searchHits[i]; if(!h) return;
+  searchRes.classList.remove('open'); searchIn.value=h.name; searchIn.blur();
   const r=document.getElementById('view-world').getBoundingClientRect();
-  setTimeout(()=>flashTip(tip,'view-world',{clientX:r.left+r.width/2,clientY:r.top+r.height*0.42},f.properties.name,state.marks[f.id]),780);
+  const flashAt=(label,mark)=>setTimeout(()=>flashTip(tip,'view-world',{clientX:r.left+r.width/2,clientY:r.top+r.height*0.42},label,mark),780);
+  if(h.type==='country'){ zoomToCountry(h.f); flashAt(h.name,state.marks[h.f.id]); }
+  else { // a searched UNESCO site beyond the 64 → pin it so you can tap to log it
+    if(h.type==='unesco' && !LANDMARKS.unesco.some(([n])=>n===h.name)){
+      LANDMARKS.unesco.push([h.name,h.lon,h.lat]); state.extraUnesco.push([h.name,h.lon,h.lat]); saveState(); }
+    state.layers[h.layer]=true; renderMarks();
+    zoomToPoint(h.lon,h.lat,5); flashAt((h.type==='parks'?ICON('park',15):ICON('unesco',15))+' '+h.name,null); }
 }
+function zoomToPoint(lon,lat,k){ if(!worldZoom) return;
+  const el=document.getElementById('world-svg'),W=el.clientWidth,H=el.clientHeight,p=wproj([lon,lat]);
+  wsvg.transition().duration(750).call(worldZoom.transform,d3.zoomIdentity.translate(W/2-k*p[0],H/2-k*p[1]).scale(k)); }
 function zoomToCountry(feat){
   if(!worldZoom) return;
   const el=document.getElementById('world-svg'),W=el.clientWidth,H=el.clientHeight;
@@ -975,7 +1394,7 @@ function zoomToCountry(feat){
 }
 searchIn.oninput=runSearch;
 searchIn.onkeydown=e=>{ if(e.key==='Enter'&&searchHits.length) pickSearch(0); };
-searchIn.onfocus=()=>{ if(searchIn.value.trim()) runSearch(); };
+searchIn.onfocus=()=>{ loadUnescoFull(); if(searchIn.value.trim()) runSearch(); };
 
 // ---------------- region search (states / provinces) ----------------
 const searchIn2=document.getElementById('search-in2'), searchRes2=document.getElementById('search-res2');
@@ -1005,7 +1424,6 @@ searchIn2.onkeydown=e=>{ if(e.key==='Enter'&&searchHits2.length) pickSearch2(0);
 searchIn2.onfocus=()=>{ if(searchIn2.value.trim()) runSearch2(); };
 
 document.addEventListener('click',e=>{
-  if(!layersMenu.contains(e.target)&&e.target!==layersBtn) layersMenu.classList.remove('open');
   if(!searchRes.contains(e.target)&&e.target!==searchIn) searchRes.classList.remove('open');
   if(!searchRes2.contains(e.target)&&e.target!==searchIn2) searchRes2.classList.remove('open');
 });
@@ -1016,16 +1434,23 @@ paintFab.onclick=e=>{e.stopPropagation();renderSheet();sheet.classList.toggle('o
 document.addEventListener('click',e=>{ if(!sheet.contains(e.target)&&e.target!==paintFab) sheet.classList.remove('open'); });
 sheet.onclick=e=>e.stopPropagation();
 function renderSheet(){
-  let h='<h3>Map key</h3>';
+  let h='<h3>Key</h3>';
   state.lists.forEach(l=>{
     h+=`<div class="pick" style="cursor:default">
       <span class="sw ${l.wish?'wish':''}" style="${l.wish?'':'background:'+l.color}"></span>
       <span class="nm">${l.name}</span></div>`;
   });
-  h+=`<div class="yearpick"><span style="font-size:10px;letter-spacing:.1em;color:#8a8270">YEAR FOR NEW TAPS</span>
+  h+=`<div class="key-sec"><div class="key-lbl">Overlays</div>
+    <label class="lyr"><input type="checkbox" id="lyr-parks" ${state.layers.parks?'checked':''}/><span class="d parks"></span>National Parks</label>
+    <label class="lyr"><input type="checkbox" id="lyr-unesco" ${state.layers.unesco?'checked':''}/><span class="d unesco"></span>UNESCO sites</label>
+    <label class="lyr"><input type="checkbox" id="lyr-journeys" ${state.journeyOverlay?'checked':''}/><span class="d journeys"></span>My Journeys</label></div>`;
+  h+=`<div class="yearpick"><span class="key-lbl" style="margin:0">Year for new taps</span>
       <input type="number" id="sheet-year" min="1900" max="2100" value="${state.year}"></div>`;
   sheet.innerHTML=h;
   document.getElementById('sheet-year').oninput=ev=>{ state.year=+ev.target.value; updatePaintFab(); };
+  document.getElementById('lyr-parks').onchange=ev=>setLayer('parks',ev.target.checked);
+  document.getElementById('lyr-unesco').onchange=ev=>setLayer('unesco',ev.target.checked);
+  document.getElementById('lyr-journeys').onchange=ev=>{ state.journeyOverlay=ev.target.checked; renderRoute(); };
 }
 function updatePaintFab(){
   document.getElementById('paint-label').textContent=state.year;
@@ -1036,7 +1461,7 @@ function updatePaintFab(){
 // ---------------- regions ----------------
 const CTH='https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@main/public/data/';
 const REGION_SETS=[
-  {code:'US', cid:'840', name:'United States', sub:'50 states', kind:'topo', src:'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json', obj:'states', proj:'albersUsa'},
+  {code:'US', cid:'840', name:'United States', sub:'50 states + territories', kind:'topo', src:'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json', obj:'states', proj:'albersUsa'},
   {code:'CA', cid:'124', name:'Canada', sub:'10 provinces + 3 territories', kind:'geo', src:CTH+'canada.geojson'},
   {code:'AU', cid:'036', name:'Australia', sub:'states + territories', kind:'geo', src:CTH+'australia.geojson'},
   {code:'CN', cid:'156', name:'China', sub:'provinces, regions & municipalities', kind:'geo', src:CTH+'china.geojson'},
@@ -1045,6 +1470,11 @@ const REGION_SETS=[
   {code:'IN', cid:'356', name:'India', sub:'states + union territories', kind:'geo', src:CTH+'india.geojson'},
   {code:'JP', cid:'392', name:'Japan', sub:'47 prefectures', kind:'geo', src:CTH+'japan.geojson'},
   {code:'DE', cid:'276', name:'Germany', sub:'16 states', kind:'geo', src:CTH+'germany.geojson'},
+  {code:'MY', cid:'458', name:'Malaysia', sub:'13 states + 3 federal territories', kind:'geo', src:CTH+'malaysia.geojson'},
+  {code:'AT', cid:'040', name:'Austria', sub:'9 states (Bundesländer)', kind:'geo', src:CTH+'austria-states.geojson'},
+  {code:'FR', cid:'250', name:'France', sub:'departments', kind:'geo', src:CTH+'france-departments.geojson'},
+  {code:'CH', cid:'756', name:'Switzerland', sub:'26 cantons', kind:'geo', src:CTH+'switzerland.geojson'},
+  {code:'RU', cid:'643', name:'Russia', sub:'federal subjects', kind:'geo', src:CTH+'russia.geojson'},
 ];
 const regionSetForCountry=id=>REGION_SETS.find(r=>r.cid===id);
 function renderRegions(){
@@ -1085,7 +1515,7 @@ function drawRegion(){
   rLand.selectAll('*').remove(); rk=1;
   rsel=rLand.selectAll('path').data(rfeats).join('path').attr('class','region').attr('d',rpath)
     .on('pointerdown',(e,d)=>lpDown(e,()=>openRegionDetail(d)))
-    .on('pointermove',(e,d)=>{ lpMove(e); showTip(tip2,'view-region',e,d.properties.name,state.regionMarks[curRegion.code][curRegion.keyFn(d)]); })
+    .on('pointermove',(e,d)=>{ lpMove(e); if(HOVER) showTip(tip2,'view-region',e,d.properties.name,state.regionMarks[curRegion.code][curRegion.keyFn(d)]); })
     .on('pointerup',(e,d)=>lpUp(()=>{ cycleRegion(d); flashTip(tip2,'view-region',e,d.properties.name,state.regionMarks[curRegion.code][curRegion.keyFn(d)]); }))
     .on('pointercancel',lpCancel)
     .on('pointerleave',()=>{ tip2.style.opacity=0; lpCancel(); });
@@ -1094,6 +1524,36 @@ function drawRegion(){
     .on('zoom',e=>{ rk=e.transform.k; rLand.attr('transform',e.transform);
       rLand.selectAll('path').attr('stroke-width',0.18/rk); });
   rsvg.call(regionZoom).on('dblclick.zoom',null);
+  renderTerritories();
+}
+// US territories — albersUsa can't place them, so they get tappable inset tiles
+const US_TERRITORIES=[['Puerto Rico','PR'],['U.S. Virgin Islands','USVI'],['Guam','Guam'],['American Samoa','Samoa'],['N. Mariana Is.','NMI']];
+let terrOpen=false;
+function renderTerritories(){
+  const box=document.getElementById('region-territories');
+  if(!curRegion || curRegion.code!=='US'){ box.style.display='none'; box.innerHTML=''; box.classList.remove('open'); return; }
+  const m=state.regionMarks['US']=state.regionMarks['US']||{};
+  box.style.display='flex';
+  if(!terrOpen){ box.classList.remove('open');
+    const n=US_TERRITORIES.filter(([name])=>m[name]).length;
+    box.innerHTML=`<button class="terr-toggle" id="terr-open">Territories${n?' · '+n:''} ＋</button>`;
+    document.getElementById('terr-open').onclick=()=>{ terrOpen=true; renderTerritories(); };
+    return;
+  }
+  box.classList.add('open');
+  box.innerHTML='<span class="terr-lbl">Territories</span>'+US_TERRITORIES.map(([name,ab])=>{
+    const mk=m[name], wish=mk&&isWish(mk), col=mk&&!wish?colorFor(mk):'';
+    return `<button class="terr ${mk?(wish?'wish':'on'):''}" data-name="${name}" title="${name}"
+      style="${col?`background:${col};color:#fff;border-color:${col}`:''}">${ab}</button>`;
+  }).join('')+'<button class="terr-close" id="terr-close" title="Hide">✕</button>';
+  box.querySelectorAll('.terr').forEach(b=>b.onclick=()=>cycleTerritory(b.dataset.name));
+  document.getElementById('terr-close').onclick=()=>{ terrOpen=false; renderTerritories(); };
+}
+function cycleTerritory(name){
+  const m=state.regionMarks['US']=state.regionMarks['US']||{}, order=cycleOrder(), cur=m[name];
+  if(!cur){ m[name]={listId:'visited',year:state.year,notes:''}; }
+  else { const nx=order[order.indexOf(cur.listId)+1]; if(nx) cur.listId=nx; else delete m[name]; }
+  renderTerritories(); checkBadges(); saveState();
 }
 function zoomToRegionFeat(feat){
   if(!regionZoom||!rpath) return;
@@ -1107,13 +1567,17 @@ function cycleRegion(d){
   const m=state.regionMarks[curRegion.code], k=curRegion.keyFn(d), order=cycleOrder(), cur=m[k];
   if(!cur){ m[k]={listId:'visited',year:state.year,notes:''}; }
   else { const nx=order[order.indexOf(cur.listId)+1]; if(nx) cur.listId=nx; else delete m[k]; }
-  paintRegion();
+  paintRegion(); checkBadges(); saveState();
 }
 function paintRegion(){
   if(!rsel) return;
   const m=state.regionMarks[curRegion.code], kf=curRegion.keyFn;
   rsel.classed('wish',d=>{const k=m[kf(d)];return k&&isWish(k);})
       .style('fill',d=>colorFor(m[kf(d)])||null);
+  // regional stat
+  const total=rfeats?rfeats.length:0, marked=Object.keys(m||{}).length;
+  const sub=document.getElementById('region-sub');
+  if(sub) sub.textContent=`${marked} of ${total} marked`;
 }
 document.getElementById('r-back').onclick=()=>go('regions');
 
@@ -1121,12 +1585,32 @@ document.getElementById('r-back').onclick=()=>go('regions');
 function renderLists(){
   const box=document.getElementById('lists-card'); box.innerHTML='';
   state.lists.forEach(l=>{
-    const n=Object.values(state.marks).filter(m=>m.listId===l.id).length;
+    const n=Object.values(state.marks).filter(m=>visitsOf(m).some(v=>v.listId===l.id)).length;
     const row=document.createElement('div'); row.className='row';
     row.innerHTML=`<span class="sw ${l.wish?'wish':''}" style="${l.wish?'':'background:'+l.color}"></span>
       <div class="nm">${l.name}<small>${l.wish?"dreaming of — doesn't color the map":'scratch-off color'}</small></div>
       <div class="ct">${n} ${n===1?'place':'places'}</div>`;
     box.appendChild(row);
+  });
+}
+function renderLandmarkLists(){
+  const box=document.getElementById('landmark-lists'); box.innerHTML='';
+  [['parks','National Parks','park','#2f7d4f'],['unesco','UNESCO World Heritage','unesco','#6c5ce0']].forEach(([layer,title,ic,col])=>{
+    const entries=Object.entries(state.places).filter(([k])=>k.startsWith(layer+':'))
+      .map(([k,v])=>({name:k.slice(layer.length+1),...v})).sort((a,b)=>a.name.localeCompare(b.name));
+    const visited=entries.filter(e=>e.listId==='visited').length, wish=entries.filter(e=>e.listId==='wishlist').length;
+    const card=document.createElement('div'); card.className='card';
+    let h=`<div class="row" style="cursor:default">
+      <span class="sw" style="background:${col};display:flex;align-items:center;justify-content:center;color:#fff">${ICON(ic,12)}</span>
+      <div class="nm">${title}<small>tap a pin on the World Map to log one</small></div>
+      <div class="ct">${visited} visited${wish?` · ${wish} wish`:''}</div></div>`;
+    if(entries.length){
+      h+='<div class="chips" style="margin-top:10px">'+entries.map(e=>
+        `<span class="chip${e.listId==='wishlist'?' wishchip':''}">${e.name}${e.listId==='visited'&&e.year?' · '+e.year:''}</span>`).join('')+'</div>';
+    } else {
+      h+=`<div class="lead" style="margin:10px 0 0;font-size:12px">None logged yet — switch the ${title} layer on in the World Map and tap a pin.</div>`;
+    }
+    card.innerHTML=h; box.appendChild(card);
   });
 }
 document.getElementById('addlist-btn').onclick=()=>{
@@ -1139,13 +1623,15 @@ document.getElementById('addlist-btn').onclick=()=>{
 function renderByYear(){
   const box=document.getElementById('byyear-card'); box.innerHTML='';
   const byYear={};
-  Object.entries(state.marks).forEach(([id,m])=>{ if(isWish(m))return; (byYear[m.year]=byYear[m.year]||[]).push(id); });
+  Object.entries(state.marks).forEach(([id,m])=>{ visitsOf(m).forEach(v=>{ if(listById(v.listId)&&listById(v.listId).wish) return;
+    (byYear[v.year]=byYear[v.year]||[]).push(id); }); });
+  Object.keys(byYear).forEach(y=>byYear[y]=[...new Set(byYear[y])]);
   const years=Object.keys(byYear).sort((a,b)=>b-a);
   if(!years.length){ box.innerHTML='<div class="lead" style="margin:0">No trips logged yet.</div>'; return; }
   years.forEach(y=>{
     const g=document.createElement('div'); g.className='yeargroup';
     g.innerHTML=`<div class="yr">${y}</div><div class="chips">`+
-      byYear[y].map(id=>`<span class="chip">${NAMES[id]||id}</span>`).join('')+`</div>`;
+      byYear[y].map(id=>`<span class="chip">${displayName(id)}</span>`).join('')+`</div>`;
     box.appendChild(g);
   });
 }
@@ -1154,7 +1640,8 @@ function renderByYear(){
 function renderAccount(){
   const visited=Object.values(state.marks).filter(m=>!isWish(m)).length;
   const wish=Object.values(state.marks).filter(m=>isWish(m)).length;
-  const years=new Set(Object.values(state.marks).filter(m=>!isWish(m)).map(m=>m.year)).size;
+  const yset=new Set(); Object.values(state.marks).forEach(m=>visitsOf(m).forEach(v=>{ if(!(listById(v.listId)&&listById(v.listId).wish)&&v.year) yset.add(v.year); }));
+  const years=yset.size;
   const stats=[[visited,'Countries'],[Math.round(visited/177*100)+'%','of the world'],[years,'Years traveled'],[wish,'On the wish list']];
   document.getElementById('account-stats').innerHTML=stats.map(s=>`<div class="statbox"><div class="n">${s[0]}</div><div class="l">${s[1]}</div></div>`).join('');
   // landmarks — only shown once you've logged some, so it stays clean for non-collectors
@@ -1168,7 +1655,436 @@ function renderAccount(){
         <div class="statbox"><div class="n">${ICON('unesco',22)} ${un}</div><div class="l">UNESCO Sites</div></div>
       </div></div>`;
   } else lm.innerHTML='';
+  renderPassport();
 }
+
+// ---------------- badges ----------------
+const REMOTE_IDS=new Set(['496','304','516','072','352','064','740','328','478','434','158','504']); // remote / low-density places
+const bvCountries=()=>Object.values(state.marks).filter(m=>!isWish(m)).length;
+const bvUsStates=()=>Object.values(state.regionMarks['US']||{}).filter(m=>!isWish(m)).length;
+const bvPlaces=layer=>Object.entries(state.places).filter(([k,v])=>k.startsWith(layer+':')&&v.listId==='visited').length;
+const bvYears=()=>new Set(Object.values(state.marks).filter(m=>!isWish(m)).map(m=>m.year)).size;
+const bvRemote=()=>Object.entries(state.marks).some(([id,m])=>!isWish(m)&&REMOTE_IDS.has(id));
+const BADGES=[
+  {id:'first',n:'1',label:'First Steps',shape:'circle',icon:'world',desc:'You logged your very first country.',test:()=>bvCountries()>=1},
+  {id:'c10',n:'10',label:'Ten & Counting',shape:'circle',icon:'world',desc:'Ten countries explored — you’re off.',test:()=>bvCountries()>=10},
+  {id:'c25',n:'25',label:'Globetrotter',shape:'shield',icon:'world',desc:'Twenty-five countries. The world is opening up.',test:()=>bvCountries()>=25},
+  {id:'c50',n:'50',label:'Half-Hundred',shape:'shield',icon:'world',desc:'Fifty countries visited. Incredible.',test:()=>bvCountries()>=50},
+  {id:'c100',n:'100',label:'Centurion',shape:'star',icon:'world',desc:'One hundred countries — a citizen of the world.',test:()=>bvCountries()>=100},
+  {id:'states50',n:'50',label:'Coast to Coast',shape:'star',icon:'flag',desc:'All fifty U.S. states, every last one.',test:()=>bvUsStates()>=50},
+  {id:'parks10',n:'10',label:'Park Ranger',shape:'shield',icon:'park',desc:'Ten U.S. National Parks logged.',test:()=>bvPlaces('parks')>=10},
+  {id:'unesco10',n:'10',label:'Heritage Hunter',shape:'shield',icon:'unesco',desc:'Ten UNESCO World Heritage sites.',test:()=>bvPlaces('unesco')>=10},
+  {id:'years5',n:'5',label:'Frequent Flyer',shape:'circle',icon:'plane',desc:'You’ve travelled across five different years.',test:()=>bvYears()>=5},
+  {id:'years10',n:'10',label:'Decade of Travel',shape:'star',icon:'calendar',desc:'Travelled across ten different years — what a run.',test:()=>bvYears()>=10},
+  {id:'wish10',n:'10',label:'Dreamer',shape:'circle',icon:'pin',desc:'Ten places on your wish list. So many dreams.',test:()=>Object.values(state.marks).filter(m=>isWish(m)).length>=10},
+  {id:'remote',n:'★',label:'Trailblazer',shape:'diamond',icon:'compass',desc:'Off the beaten path — somewhere wonderfully remote.',test:()=>bvRemote()},
+];
+function badgeHTML(b,cls){ return `<div class="badge ${cls} shape-${b.shape}" data-id="${b.id}">
+    <div class="badge-emblem"><span class="badge-ico">${ICON(b.icon,40)}</span><span class="badge-n">${b.n}</span></div>
+    <div class="badge-name">${b.label}</div></div>`; }
+function renderBadges(){
+  const box=document.getElementById('badges-grid'); if(!box) return;
+  const earned=BADGES.filter(b=>b.test()).length;
+  box.innerHTML=`<p class="mini-lbl" style="margin:0 0 12px">${earned} of ${BADGES.length} earned · tap a badge to read it</p>
+    <div class="badge-grid">${BADGES.map(b=>badgeHTML(b,b.test()?'earned':'locked')).join('')}</div>`;
+  box.querySelectorAll('.badge').forEach(el=>el.onclick=()=>viewBadge(BADGES.find(b=>b.id===el.dataset.id)));
+}
+function contFromLL(lat,lon){
+  if(lat<-60) return 'Antarctica';
+  if(lon>=-170&&lon<-30&&lat>=13) return 'North America';
+  if(lon>=-92&&lon<-30&&lat<13) return 'South America';
+  if(lon>=-25&&lon<=42&&lat>=34) return 'Europe';
+  if(lon>=-20&&lon<=52&&lat<34) return 'Africa';
+  if(lon>=112&&lat<-10) return 'Oceania';
+  return 'Asia';
+}
+function continentOf(id){
+  if(C_LL[id]) return contFromLL(C_LL[id][0],C_LL[id][1]);
+  const f=wfeats&&wfeats.find(x=>x.id===id); if(!f) return 'World';
+  const c=d3.geoCentroid(f); return contFromLL(c[1],c[0]);
+}
+const CONTINENT_ORDER=['North America','South America','Europe','Africa','Asia','Oceania','Antarctica','World'];
+const CONTINENTS=['North America','South America','Europe','Africa','Asia','Oceania','Antarctica'];
+function renderContinents(){
+  const box=document.getElementById('continents-card'); if(!box) return;
+  const visited={};
+  Object.entries(state.marks).forEach(([id,m])=>{ if(isWish(m))return; const c=continentOf(id); visited[c]=(visited[c]||0)+1; });
+  const rows=CONTINENTS.map(c=>{ const v=visited[c]||0, t=CONTINENT_TOTALS[c]||0; if(!v&&!t) return '';
+    return `<div class="row" style="cursor:default"><div class="nm">${c}<small>${v}${t?(' of '+t+' countries'):' visited'}</small></div>
+      <div class="ct">${t?Math.round(v/t*100)+'%':v}</div></div>`; }).filter(Boolean).join('');
+  box.innerHTML=rows||'<div class="lead" style="margin:0">No countries logged yet.</div>';
+}
+// ---------------- airports (searchable; not on the map) ----------------
+let AIRPORTS=null, airportsLoading=false;
+function loadAirports(cb){
+  if(AIRPORTS){ cb&&cb(); return; }
+  if(airportsLoading) return; airportsLoading=true;
+  fetch('https://cdn.jsdelivr.net/gh/mwgg/Airports@master/airports.json').then(r=>r.json()).then(d=>{
+    AIRPORTS=Object.values(d).filter(a=>a.iata).map(a=>({iata:a.iata,name:a.name,city:a.city,country:a.country,lat:a.lat,lon:a.lon}));
+    airportsLoading=false; cb&&cb();
+  }).catch(()=>{ airportsLoading=false; });
+}
+function renderAirports(){
+  const box=document.getElementById('airports-card'); if(!box) return;
+  const logged=Object.entries(state.airports).sort((a,b)=>a[0].localeCompare(b[0]));
+  box.innerHTML=`<div class="searchbox" style="position:relative;margin-bottom:10px">
+      <span class="si" id="ap-si"></span>
+      <input id="ap-search" placeholder="Search an airport (name or code)…" autocomplete="off"/>
+      <div id="ap-res" class="sres"></div></div>`+
+    (logged.length? logged.map(([code,a])=>`<div class="row" style="cursor:default"><div class="nm">${code} — ${a.name}<small>${a.city||''}${a.country?', '+a.country:''}${a.year?' · '+a.year:''}</small></div><span class="aprm" data-code="${code}" title="Remove">✕</span></div>`).join('')
+      : '<div class="lead" style="margin:0;font-size:13px">None yet — search above to add the airports you\'ve flown through.</div>');
+  box.querySelector('#ap-si').innerHTML=ICON('search',15);
+  const inp=box.querySelector('#ap-search'), res=box.querySelector('#ap-res');
+  function apSearch(){ const q=inp.value.trim().toLowerCase();
+    if(!q){ res.classList.remove('open'); return; }
+    if(!AIRPORTS){ res.innerHTML='<div class="none">Loading airports…</div>'; res.classList.add('open'); loadAirports(()=>{ if(inp.value.trim()) apSearch(); }); return; }
+    const hits=AIRPORTS.filter(a=>a.iata.toLowerCase()===q||a.name.toLowerCase().includes(q)||(a.city||'').toLowerCase().includes(q))
+      .sort((a,b)=>(a.iata.toLowerCase()===q?-1:0)-(b.iata.toLowerCase()===q?-1:0)).slice(0,8);
+    res.innerHTML=hits.length?hits.map((a,i)=>`<div class="sr" data-i="${i}"><span class="srl"><b>${a.iata}</b> — ${a.name}<small>${a.city||''}${a.country?', '+a.country:''}</small></span></div>`).join(''):'<div class="none">No airport found</div>';
+    res.classList.add('open');
+    res.querySelectorAll('.sr').forEach((el,i)=>el.onclick=()=>{ const a=hits[i];
+      state.airports[a.iata]={name:a.name,city:a.city,country:a.country,lat:a.lat,lon:a.lon,year:state.year}; saveState(); renderAirports(); });
+  }
+  inp.onfocus=()=>loadAirports(()=>{ if(inp.value.trim()) apSearch(); });
+  inp.oninput=apSearch;
+  box.querySelectorAll('.aprm').forEach(el=>el.onclick=()=>{ delete state.airports[el.dataset.code]; saveState(); renderAirports(); });
+}
+// ---------------- timeline ----------------
+function renderTimeline(){
+  const box=document.getElementById('timeline-body'); if(!box) return;
+  const z=state.timelineZoom;
+  document.getElementById('tl-level').textContent = z===1?'Countries':(z===2?'+ Cities':'+ Landmarks');
+  const entries=[];
+  Object.entries(state.marks).forEach(([id,m])=>{ visitsOf(m).forEach(v=>{ if(listById(v.listId)&&listById(v.listId).wish) return;
+    entries.push({year:+v.year||0,name:displayName(id),flag:flagURL(id),kind:'country'}); }); });
+  if(z>=2){ Object.values(state.airports).forEach(a=>entries.push({year:+a.year||0,name:a.iata+' · '+(a.city||a.name),kind:'plane'}));
+    state.journeys.forEach(j=>{ const y=j.start?+j.start.slice(0,4):0; (j.stops||[]).forEach(s=>{ if(s.kind==='city') entries.push({year:y,name:s.name,kind:'city'}); }); }); }
+  if(z>=3){ Object.entries(state.places).forEach(([k,v])=>{ if(v.listId!=='visited')return; const layer=k.split(':')[0];
+    entries.push({year:+v.year||0,name:k.slice(layer.length+1),kind:layer==='parks'?'park':'unesco'}); }); }
+  const byYear={}; entries.forEach(e=>{ (byYear[e.year]=byYear[e.year]||[]).push(e); });
+  const years=Object.keys(byYear).map(Number).filter(y=>y>0).sort((a,b)=>b-a);
+  if(!years.length){ box.innerHTML='<div class="lead">Nothing logged yet — tap countries on the World Map and they\'ll appear here by year.</div>'; return; }
+  box.innerHTML=years.map(y=>{
+    const items=byYear[y].sort((a,b)=>a.name.localeCompare(b.name));
+    return `<div class="tl-year"><div class="tl-y">${y}</div><div class="tl-items">`+
+      items.map(e=>`<span class="tl-entry tl-${e.kind}">${e.flag?`<img class="tl-flag" src="${e.flag}" alt="" loading="lazy"/>`:`<span class="tl-ic">${ICON(e.kind==='park'?'park':e.kind==='unesco'?'unesco':e.kind==='plane'?'plane':'city',14)}</span>`}<span class="tl-nm">${e.name}</span></span>`).join('')+
+      `</div></div>`;
+  }).join('');
+}
+function setTLZoom(z){ state.timelineZoom=Math.max(1,Math.min(3,z)); renderTimeline(); }
+document.getElementById('tl-plus').onclick=()=>setTLZoom(state.timelineZoom+1);
+document.getElementById('tl-minus').onclick=()=>setTLZoom(state.timelineZoom-1);
+(function(){ // pinch to change granularity
+  const el=document.getElementById('view-timeline'); let d0=0;
+  el.addEventListener('touchstart',e=>{ if(e.touches.length===2){ d0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); } },{passive:true});
+  el.addEventListener('touchmove',e=>{ if(e.touches.length===2&&d0){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    if(d-d0>60){ setTLZoom(state.timelineZoom+1); d0=d; } else if(d0-d>60){ setTLZoom(state.timelineZoom-1); d0=d; } } },{passive:true});
+})();
+// ---------------- passport QR share + read-only shared view ----------------
+function sharePayload(){
+  const codes=Object.entries(state.marks).filter(([id,m])=>!isWish(m)).map(([id])=>C_A2[id]).filter(Boolean);
+  return { n:(state.user||'').split('@')[0]||'A traveller', c:codes };
+}
+function openQR(){
+  loadCountryData();
+  const data=sharePayload();
+  const url=location.origin+location.pathname+'#share='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(data)))));
+  const box=document.getElementById('qr-box'); box.innerHTML='';
+  if(window.QRCode){ new QRCode(box,{text:url,width:220,height:220,colorDark:getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()||'#222',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M}); }
+  else box.innerHTML='<div class="lead" style="margin:0">QR unavailable.</div>';
+  document.getElementById('qr-copy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(url); document.getElementById('qr-copy').textContent='Copied!'; setTimeout(()=>document.getElementById('qr-copy').textContent='Copy link',1400); };
+  document.getElementById('qr-modal').classList.add('open');
+}
+document.getElementById('qr-x').onclick=()=>document.getElementById('qr-modal').classList.remove('open');
+document.getElementById('qr-modal').onclick=e=>{ if(e.target.id==='qr-modal') e.currentTarget.classList.remove('open'); };
+
+// ---------------- backup / export / import ----------------
+function fullBackup(){
+  let theme='',units='mi',native=0;
+  try{ theme=localStorage.getItem('wl_theme')||''; units=localStorage.getItem('wl_units')||'mi'; native=localStorage.getItem('wl_native')==='1'?1:0; }catch(e){}
+  return { app:'wanderlines', version:1, exportedAt:new Date().toISOString(),
+    prefs:{ theme, units, native },
+    data:{ marks:state.marks, regionMarks:state.regionMarks, places:state.places, lists:state.lists,
+      journeys:state.journeys, year:state.year, extraUnesco:state.extraUnesco, airports:state.airports } };
+}
+function backupMsg(t,ok){ const el=document.getElementById('backup-msg'); if(!el) return;
+  el.textContent=t; el.style.display='block'; el.style.color=ok===false?'var(--accent)':'var(--muted)'; }
+function exportBackup(){
+  saveState();
+  const blob=new Blob([JSON.stringify(fullBackup(),null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  const d=new Date(), ymd=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  a.href=url; a.download='wanderlines-backup-'+ymd+'.json'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  const n=Object.keys(state.marks).length; backupMsg('Backup saved — '+n+' countries, '+state.journeys.length+' journeys.');
+}
+function applyBackup(obj){
+  const d=(obj&&obj.data)?obj.data:obj; // tolerate a raw state object too
+  if(!d||typeof d!=='object'||(!d.marks&&!d.journeys&&!d.places)) throw new Error('not a Wanderlines backup');
+  try{ localStorage.setItem('wl_data', JSON.stringify({ marks:d.marks||{}, regionMarks:d.regionMarks||{}, places:d.places||{},
+    lists:d.lists, journeys:Array.isArray(d.journeys)?d.journeys:[], year:d.year, extraUnesco:d.extraUnesco||[], airports:d.airports||{} })); }catch(e){}
+  if(obj&&obj.prefs){ try{ if(obj.prefs.theme) localStorage.setItem('wl_theme',obj.prefs.theme);
+    if(obj.prefs.units) localStorage.setItem('wl_units',obj.prefs.units);
+    localStorage.setItem('wl_native',obj.prefs.native?'1':'0'); }catch(e){} }
+  location.reload();
+}
+(function(){
+  const eb=document.getElementById('export-btn'), ib=document.getElementById('import-btn'), inp=document.getElementById('import-file');
+  if(eb) eb.onclick=exportBackup;
+  if(ib&&inp) ib.onclick=()=>inp.click();
+  if(inp) inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ let obj; try{ obj=JSON.parse(r.result); }catch(e){ backupMsg('That file isn’t valid JSON.',false); inp.value=''; return; }
+      const have=Object.keys(state.marks).length;
+      if(have && !confirm('Restoring this backup will replace your current map ('+have+' countries logged). Continue?')){ inp.value=''; return; }
+      try{ applyBackup(obj); }catch(e){ backupMsg('Couldn’t read that backup — '+e.message+'.',false); inp.value=''; }
+    };
+    r.readAsText(f); };
+})();
+
+// ---------------- passport share card (canvas → PNG) ----------------
+function rrect(x,a,b,w,h,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+w,b,a+w,b+h,r); x.arcTo(a+w,b+h,a,b+h,r); x.arcTo(a,b+h,a,b,r); x.arcTo(a,b,a+w,b,r); x.closePath(); }
+function loadImg(src){ return new Promise(res=>{ const im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src; }); }
+async function buildPassportCard(){
+  try{ await (document.fonts&&document.fonts.ready); }catch(e){}
+  const cs=getComputedStyle(document.documentElement), tok=(n,f)=>(cs.getPropertyValue(n).trim()||f);
+  const paper=tok('--paper','#f7efe0'), ink=tok('--ink','#2a2118'), muted=tok('--muted','#9a8f7d'),
+    accent=tok('--accent','#d4561f'), accent2=tok('--accent2','#caa24a'), ocean=tok('--ocean','#efe4cf'),
+    field=tok('--field','#fff'), rule=tok('--rule','#0002'), onAcc=tok('--on-accent','#fff'),
+    fDisp=tok('--font-display','700 system-ui'), fBody=tok('--font','system-ui'), fHand=tok('--font-hand',fBody);
+  const visited=Object.entries(state.marks).filter(([id,m])=>!isWish(m)).map(([id])=>id);
+  const wish=Object.values(state.marks).filter(m=>isWish(m)).length;
+  const years=new Set(visited.map(id=>state.marks[id].year).filter(Boolean)).size;
+  const pct=Math.round(visited.length/177*100);
+  const earned=BADGES.filter(b=>b.test()).length;
+  const name=(state.user||'').split('@')[0]; const who=name?name.charAt(0).toUpperCase()+name.slice(1):'A Traveller';
+  // continent tallies
+  const cont={}; visited.forEach(id=>{ const c=continentOf(id); cont[c]=(cont[c]||0)+1; });
+  const W=1080,H=1350,M=46; const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
+  // backdrop
+  x.fillStyle=ocean; x.fillRect(0,0,W,H);
+  rrect(x,M,M,W-2*M,H-2*M,40); x.fillStyle=paper; x.fill();
+  x.lineWidth=5; x.strokeStyle=accent; x.stroke();
+  x.save(); x.setLineDash([3,9]); x.lineWidth=2; x.strokeStyle=accent; rrect(x,M+22,M+22,W-2*M-44,H-2*M-44,26); x.stroke(); x.restore();
+  let cy=M+96; x.textAlign='center';
+  x.fillStyle=accent; x.font='600 26px '+fBody; x.fillText('✦   W A N D E R L I N E S   ✦',W/2,cy); cy+=78;
+  x.fillStyle=ink; x.font='80px '+fDisp; x.fillText('PASSPORT',W/2,cy); cy+=58;
+  x.fillStyle=muted; x.font='400 34px '+fHand; x.fillText(who,W/2,cy); cy+=20;
+  // stat strip
+  cy+=44; const stats=[[String(visited.length),'COUNTRIES'],[pct+'%','OF THE WORLD'],[String(years),'YEARS'],[String(wish),'WISH LIST']];
+  const sw=(W-2*(M+30))/4, sx0=M+30;
+  stats.forEach((s,i)=>{ const sx=sx0+i*sw; x.fillStyle=ink; x.font='700 56px '+fDisp; x.textAlign='center'; x.fillText(s[0],sx+sw/2,cy+20);
+    x.fillStyle=muted; x.font='600 19px '+fBody; x.fillText(s[1],sx+sw/2,cy+54); });
+  cy+=110;
+  // continents bar
+  x.strokeStyle=rule; x.lineWidth=2; x.beginPath(); x.moveTo(M+40,cy); x.lineTo(W-M-40,cy); x.stroke(); cy+=46;
+  x.textAlign='left'; x.fillStyle=accent; x.font='600 22px '+fBody; x.fillText('BY CONTINENT',M+40,cy); cy+=14;
+  const conts=CONTINENTS.filter(c=>cont[c]); const maxc=Math.max(1,...conts.map(c=>cont[c]));
+  cy+=26; const barMax=W-2*M-470; conts.forEach(c=>{ const bw=barMax*(cont[c]/maxc);
+    x.fillStyle=muted; x.font='400 22px '+fBody; x.textAlign='left'; x.fillText(c,M+40,cy+6);
+    rrect(x,M+300,cy-16,Math.max(8,bw),22,11); x.fillStyle=accent2; x.fill();
+    x.fillStyle=ink; x.font='700 22px '+fBody; x.textAlign='right'; x.fillText(cont[c],W-M-46,cy+6); cy+=44; });
+  cy+=22;
+  // flags
+  x.textAlign='left'; x.fillStyle=accent; x.font='600 22px '+fBody; x.fillText('STAMPS COLLECTED',M+40,cy); cy+=34;
+  loadCountryData();
+  const cols=9, fw=88, fh=58, gap=(W-2*(M+34)-cols*fw)/(cols-1), maxRows=4, capN=cols*maxRows;
+  const show=visited.slice().sort((a,b)=>(displayName(a)).localeCompare(displayName(b))).slice(0,capN);
+  const imgs=await Promise.all(show.map(id=>C_A2[id]?loadImg('https://flagcdn.com/w160/'+C_A2[id]+'.png'):Promise.resolve(null)));
+  imgs.forEach((im,i)=>{ const r=Math.floor(i/cols), col=i%cols, fx=M+34+col*(fw+gap), fy=cy+r*(fh+14);
+    rrect(x,fx,fy,fw,fh,7); x.save(); x.clip(); if(im){ x.drawImage(im,fx,fy,fw,fh); } else { x.fillStyle=field; x.fillRect(fx,fy,fw,fh); } x.restore();
+    x.lineWidth=1.5; x.strokeStyle=rule; rrect(x,fx,fy,fw,fh,7); x.stroke(); });
+  const rowsUsed=Math.ceil(show.length/cols); cy+=rowsUsed*(fh+14)+6;
+  if(visited.length>capN){ x.fillStyle=muted; x.font='400 22px '+fBody; x.textAlign='left'; x.fillText('+ '+(visited.length-capN)+' more',M+34,cy+8); cy+=30; }
+  // footer
+  const fyb=H-M-58; x.strokeStyle=rule; x.lineWidth=2; x.beginPath(); x.moveTo(M+40,fyb-26); x.lineTo(W-M-40,fyb-26); x.stroke();
+  x.textAlign='left'; x.fillStyle=ink; x.font='600 24px '+fDisp; x.fillText('wanderlines · a travel log',M+40,fyb+8);
+  x.textAlign='right'; x.fillStyle=accent; x.font='700 24px '+fBody; x.fillText(earned+' / '+BADGES.length+' badges',W-M-46,fyb+8);
+  return cv;
+}
+let cardBlobURL=null;
+async function openCard(){
+  const m=document.getElementById('card-modal'); m.classList.add('open');
+  const prev=document.getElementById('card-preview'); prev.innerHTML='<div class="lead" style="margin:0">Drawing your card…</div>';
+  let cv; try{ cv=await buildPassportCard(); }catch(e){ prev.innerHTML='<div class="lead" style="margin:0">Couldn’t draw the card.</div>'; return; }
+  const img=new Image(); img.alt='Your Wanderlines passport card'; img.src=cv.toDataURL('image/png');
+  prev.innerHTML=''; prev.appendChild(img);
+  const dl=document.getElementById('card-download'), sh=document.getElementById('card-share');
+  dl.onclick=()=>cv.toBlob(b=>{ const u=URL.createObjectURL(b), a=document.createElement('a'); a.href=u; a.download='wanderlines-passport.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),2000); },'image/png');
+  if(navigator.canShare){ sh.style.display=''; sh.onclick=()=>cv.toBlob(async b=>{ const file=new File([b],'wanderlines-passport.png',{type:'image/png'});
+    try{ if(navigator.canShare({files:[file]})) await navigator.share({files:[file],title:'My Wanderlines passport'}); }catch(e){} },'image/png'); }
+  else sh.style.display='none';
+}
+(function(){ const m=document.getElementById('card-modal');
+  document.getElementById('card-x').onclick=()=>m.classList.remove('open');
+  m.onclick=e=>{ if(e.target.id==='card-modal') m.classList.remove('open'); };
+})();
+
+// ---------------- live map (Leaflet) + share faces ----------------
+const MAP_FACES=[
+  {id:'voyager', name:'Voyager',  url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', sub:'abcd', max:20, attr:'© OpenStreetMap · © CARTO'},
+  {id:'positron',name:'Light',    url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',          sub:'abcd', max:20, attr:'© OpenStreetMap · © CARTO'},
+  {id:'dark',    name:'Dark',     url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',           sub:'abcd', max:20, attr:'© OpenStreetMap · © CARTO'},
+  {id:'osm',     name:'Classic',  url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',                   sub:'abc',  max:19, attr:'© OpenStreetMap contributors'},
+  {id:'topo',    name:'Terrain',  url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                     sub:'abc',  max:17, attr:'© OpenStreetMap, SRTM · © OpenTopoMap (CC-BY-SA)'},
+  {id:'sat',     name:'Satellite',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', sub:'', max:19, attr:'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics'},
+];
+let lmap=null, lmLayer=null, lmOverlay=[], curFace='voyager';
+function setFace(id){ const f=MAP_FACES.find(x=>x.id===id)||MAP_FACES[0]; curFace=f.id;
+  if(lmLayer) lmap.removeLayer(lmLayer);
+  lmLayer=L.tileLayer(f.url,{subdomains:f.sub||'abc',maxZoom:f.max||19,attribution:f.attr}).addTo(lmap);
+  document.querySelectorAll('#face-row .face').forEach(el=>el.classList.toggle('on',el.dataset.face===f.id));
+  document.getElementById('face-cred').textContent='Tiles: '+f.attr;
+}
+function buildFaceRow(){ const row=document.getElementById('face-row');
+  row.innerHTML=MAP_FACES.map(f=>`<button class="face ${f.id===curFace?'on':''}" data-face="${f.id}">${f.name}</button>`).join('');
+  row.querySelectorAll('.face').forEach(el=>el.onclick=()=>setFace(el.dataset.face));
+}
+function plotTravels(){
+  lmOverlay.forEach(o=>lmap.removeLayer(o)); lmOverlay=[];
+  const cs=getComputedStyle(document.documentElement), accent=cs.getPropertyValue('--accent').trim()||'#d4561f';
+  const pts=[];
+  Object.entries(state.marks).forEach(([id,m])=>{ const ll=C_LL[id]; if(!ll) return;
+    const p=primaryVisit(m), wl=listById(p.listId), wish=wl&&wl.wish, col=wish?'#9a8f7d':(colorFor(m)||accent);
+    const years=[...new Set(visitsOf(m).map(v=>v.year).filter(Boolean))].sort();
+    const mk=L.circleMarker([ll[0],ll[1]],{radius:wish?5:7,color:'#fff',weight:1.6,fillColor:col,fillOpacity:.95});
+    mk.bindPopup(`<b>${displayName(id)}</b><br>${wish?'Wish list':(wl?wl.name:'')}${years.length?' · '+years.join(', '):''}`);
+    mk.addTo(lmap); lmOverlay.push(mk); if(!wish) pts.push([ll[0],ll[1]]);
+  });
+  state.journeys.forEach(j=>{ const line=(j.stops||[]).filter(s=>s.lat!=null&&s.lon!=null).map(s=>[s.lat,s.lon]);
+    if(line.length>1){ const pl=L.polyline(line,{color:accent,weight:2.5,opacity:.75}); pl.addTo(lmap); lmOverlay.push(pl); } });
+  if(pts.length){ try{ lmap.fitBounds(L.latLngBounds(pts).pad(0.25)); }catch(e){} }
+}
+function openLiveMap(){
+  const modal=document.getElementById('livemap-modal'); modal.classList.add('open'); loadCountryData();
+  setTimeout(()=>{
+    if(!window.L){ document.getElementById('livemap').innerHTML='<div class="lead" style="padding:24px;text-align:center">Map library couldn’t load.</div>'; return; }
+    if(!lmap){ lmap=L.map('livemap',{worldCopyJump:true,minZoom:1}).setView([20,0],2); buildFaceRow(); setFace(curFace); }
+    lmap.invalidateSize(); plotTravels(); setTimeout(()=>lmap.invalidateSize(),120);
+  },140);
+}
+(function(){ const m=document.getElementById('livemap-modal');
+  document.getElementById('livemap-x').onclick=()=>m.classList.remove('open');
+  m.onclick=e=>{ if(e.target.id==='livemap-modal') m.classList.remove('open'); };
+})();
+
+function maybeShowShared(){
+  const h=location.hash||''; const i=h.indexOf('share=');
+  if(i<0) return false;
+  let data; try{ data=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h.slice(i+6)))))); }catch(e){ return false; }
+  loadCountryData();
+  const render=()=>{
+    const codes=data.c||[], conts={};
+    const a2num={}; for(const id in C_A2) a2num[C_A2[id]]=id;
+    codes.forEach(c=>{ const id=a2num[c]; if(id){ const cont=continentOf(id); conts[cont]=(conts[cont]||0)+1; } });
+    const flags=codes.map(c=>`<span class="flag"><img src="https://flagcdn.com/h40/${c}.png" alt="" loading="lazy"/></span>`).join('');
+    document.getElementById('shared-view').innerHTML=`<div class="shared-card">
+      <div class="eyebrow" style="color:var(--accent)">Wanderlines passport</div>
+      <h2 style="font-family:var(--font-display);margin:6px 0 2px">${(data.n||'A traveller')}</h2>
+      <p class="lead" style="margin:0 0 14px">${codes.length} countries · ${Math.round(codes.length/195*100)}% of the world</p>
+      <div class="flag-grid">${flags}</div>
+      <button class="btn primary" id="shared-dismiss" style="margin-top:18px;width:100%;justify-content:center">Make your own ›</button></div>`;
+    document.getElementById('shared-view').classList.add('open');
+    document.getElementById('shared-dismiss').onclick=()=>{ history.replaceState(null,'',location.pathname); document.getElementById('shared-view').classList.remove('open'); };
+  };
+  if(Object.keys(C_A2).length) render(); else setTimeout(()=>maybeShowShared(),600);
+  return true;
+}
+let ppPage='stamps';
+function renderPassport(){
+  const box=document.getElementById('badges-grid'); if(!box) return;
+  const visitedIds=Object.entries(state.marks).filter(([id,m])=>!isWish(m)).map(([id])=>id);
+  // Stamps page
+  const stamps={};
+  visitedIds.forEach(id=>{ const cont=continentOf(id); (stamps[cont]=stamps[cont]||[]).push({name:displayName(id),year:state.marks[id].year}); });
+  let stampHTML='';
+  CONTINENT_ORDER.filter(c=>stamps[c]).forEach(c=>{
+    const list=stamps[c].sort((a,b)=>a.name.localeCompare(b.name));
+    stampHTML+=`<div class="stamp-group"><div class="stamp-cont">${c} · ${list.length}</div><div class="stamps">`+
+      list.map((s,i)=>`<span class="stamp" style="--rot:${[-4,3,-2,4,-3][i%5]}deg"><b>${s.name}</b><i>${s.year||''}</i></span>`).join('')+`</div></div>`;
+  });
+  if(!stampHTML) stampHTML='<div class="lead" style="margin:0 0 14px;font-size:13px">No stamps yet — tap countries on the World Map to collect them.</div>';
+  // Flags page
+  const flagsHTML = visitedIds.length ? '<div class="flag-grid">'+visitedIds.sort((a,b)=>displayName(a).localeCompare(displayName(b))).map(id=>{
+    const u=flagURL(id); return `<button class="flag" data-fid="${id}" title="Show ${displayName(id)} on the map">${u?`<img src="${u}" alt="" loading="lazy"/>`:'<span class="noflag"></span>'}<span class="flag-nm">${displayName(id)}</span></button>`;
+  }).join('')+'</div>' : '<div class="lead" style="margin:0 0 14px;font-size:13px">No flags yet — tap countries to collect them.</div>';
+  const earned=BADGES.filter(b=>b.test()).length;
+  const tab=(id,lbl)=>`<button class="pp-tab ${ppPage===id?'on':''}" data-pp="${id}">${lbl}</button>`;
+  box.innerHTML=`<div class="pp-tabs">${tab('stamps','Stamps')}${tab('flags','Flags')}</div>`+
+    (ppPage==='flags'?flagsHTML:stampHTML)+
+    `<div class="pp-sec-lbl" style="margin-top:18px">Badges · ${earned} of ${BADGES.length} · tap to read</div>
+    <div class="badge-grid">${BADGES.map(b=>badgeHTML(b,b.test()?'earned':'locked')).join('')}</div>`;
+  box.querySelectorAll('.pp-tab').forEach(el=>el.onclick=()=>{ ppPage=el.dataset.pp; renderPassport(); });
+  box.querySelectorAll('.badge').forEach(el=>el.onclick=()=>viewBadge(BADGES.find(b=>b.id===el.dataset.id)));
+  box.querySelectorAll('.flag').forEach(el=>el.onclick=()=>flagToMap(el.dataset.fid));
+}
+function flagToMap(id){ const f=wfeats&&wfeats.find(x=>x.id===id); go('world'); if(f) setTimeout(()=>zoomToCountry(f),100); }
+function viewBadge(b){
+  const pop=document.getElementById('badge-pop'), earned=b.test(); popBadge=earned?b:null;
+  pop.querySelector('.pop-badge').className='badge '+(earned?'earned':'locked')+' shape-'+b.shape+' pop-badge';
+  pop.querySelector('.pop-badge .badge-ico').innerHTML=ICON(b.icon,52);
+  pop.querySelector('.pop-badge .badge-n').textContent=b.n;
+  pop.querySelector('.eyebrow').textContent=earned?'Badge earned':'Locked — keep travelling';
+  document.getElementById('pop-name').textContent=b.label;
+  document.getElementById('pop-desc').textContent=b.desc;
+  document.getElementById('pop-share').style.display=earned?'':'none';
+  document.getElementById('confetti').innerHTML='';
+  pop.classList.add('show');
+}
+let badgeQueue=[];
+function badgeSeen(){ try{ return new Set(JSON.parse(localStorage.getItem('wl_badges')||'[]')); }catch(_){ return new Set(); } }
+function checkBadges(){
+  const seen=badgeSeen(), newly=BADGES.filter(b=>b.test()&&!seen.has(b.id));
+  if(!newly.length) return;
+  newly.forEach(b=>seen.add(b.id));
+  try{ localStorage.setItem('wl_badges',JSON.stringify([...seen])); }catch(_){}
+  badgeQueue.push(...newly);
+  if(!document.getElementById('badge-pop').classList.contains('show')) showNextBadge();
+}
+let popBadge=null;
+function showNextBadge(){
+  const pop=document.getElementById('badge-pop'), b=badgeQueue.shift(); popBadge=b;
+  if(!b){ pop.classList.remove('show'); document.getElementById('confetti').innerHTML=''; return; }
+  pop.querySelector('.pop-badge').className='badge earned shape-'+b.shape+' pop-badge';
+  pop.querySelector('.pop-badge .badge-ico').innerHTML=ICON(b.icon,52);
+  pop.querySelector('.pop-badge .badge-n').textContent=b.n;
+  pop.querySelector('.eyebrow').textContent='Badge earned!';
+  document.getElementById('pop-share').style.display='';
+  document.getElementById('pop-name').textContent=b.label;
+  document.getElementById('pop-desc').textContent=b.desc;
+  pop.classList.add('show'); fireConfetti();
+}
+function fireConfetti(){
+  const c=document.getElementById('confetti'); c.innerHTML='';
+  const g=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  const cols=[g('--accent'),g('--accent2'),g('--gold'),'#fff'];
+  for(let i=0;i<46;i++){ const d=document.createElement('i');
+    d.style.left=(Math.random()*100)+'%'; d.style.background=cols[i%cols.length];
+    d.style.animationDelay=(Math.random()*0.5)+'s'; d.style.animationDuration=(1.6+Math.random()*1.3)+'s';
+    d.style.width=(6+Math.random()*6)+'px'; c.appendChild(d); }
+}
+document.getElementById('badge-pop').onclick=e=>{ if(e.target.id==='pop-share') return; showNextBadge(); };
+document.getElementById('pop-share').onclick=e=>{ e.stopPropagation(); if(popBadge) shareBadge(popBadge); };
+async function shareBadge(b){
+  const g=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  const W=720,H=900, c=document.createElement('canvas'); c.width=W;c.height=H; const x=c.getContext('2d');
+  const vibe=document.documentElement.dataset.theme, gradientVibe=(vibe==='disco'||vibe==='sleek');
+  let fill=g('--accent')||'#df4d12';
+  if(gradientVibe){ const grad=x.createLinearGradient(0,0,W,H); grad.addColorStop(0,g('--accent')||'#df4d12'); grad.addColorStop(1,g('--accent2')||'#0c8a6f'); fill=grad; }
+  x.fillStyle=g('--ocean-hi')||'#fff'; x.fillRect(0,0,W,H);
+  x.save(); x.translate(W/2,330); x.beginPath(); x.arc(0,0,130,0,7); x.fillStyle=fill; x.fill();
+  x.fillStyle=g('--on-accent')||'#fff'; x.font=`700 92px ${(g('--font-display')||'sans-serif').replace(/\s+/g,' ')}`; x.textAlign='center'; x.textBaseline='middle'; x.fillText(b.n,0,6); x.restore();
+  x.fillStyle=g('--ink')||'#222'; x.textAlign='center';
+  x.font=`700 44px ${(g('--font-display')||'sans-serif').replace(/\s+/g,' ')}`; x.fillText(b.label,W/2,560);
+  x.fillStyle=g('--muted')||'#888'; x.font='26px system-ui'; wrapText(x,b.desc,W/2,620,W-160,36);
+  x.fillStyle=g('--accent')||'#df4d12'; x.font=`700 24px ${(g('--font-display')||'sans-serif').replace(/\s+/g,' ')}`; x.fillText('✦ WANDERLINES',W/2,H-60);
+  const blob=await new Promise(r=>c.toBlob(r,'image/png')), file=new File([blob],'badge.png',{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:b.label,text:`I earned the “${b.label}” badge on Wanderlines!`}); return; }catch(_){} }
+  const a=document.createElement('a'); a.download='wanderlines_badge.png'; a.href=URL.createObjectURL(blob); a.click();
+}
+function wrapText(ctx,text,cx,y,maxW,lh){ const words=(text||'').split(' '); let line=''; const lines=[];
+  words.forEach(w=>{ const t=line?line+' '+w:w; if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w;}else line=t;}); lines.push(line);
+  lines.forEach((ln,i)=>ctx.fillText(ln,cx,y+i*lh)); }
 
 // ---------------- journeys (Mode B) ----------------
 function fmtDate(s){ if(!s) return ''; const d=new Date(s+'T00:00:00'); return isNaN(d)?s:d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
@@ -1180,17 +2096,17 @@ function renderJourneys(){
     const chips=j.stops.map((s,i)=>`<span class="jchip"><span class="seq">${i+1}</span>${STOP_KINDS[s.kind]||ICON('pin',16)} ${s.name}</span>`).join('')||'<span class="lead" style="font-size:12px">No stops yet</span>';
     const rating=(j.review&&j.review.rating)?`<span class="jrate">${'★'.repeat(j.review.rating)}<span class="off">${'★'.repeat(5-j.review.rating)}</span></span>`:'';
     const veh=(j.modes||[]).map(m=>ICONS[m]?ICON(m,15):'').join(' ');
-    return `<div class="journey" data-id="${j.id}">
+    return `<div class="journey tappable" data-id="${j.id}">
       <div class="jh"><div class="jn">${j.name}</div>${rating}</div>
       <div class="jd">${fmtRange(j.start,j.end)} · ${j.stops.length} stop${j.stops.length===1?'':'s'}${veh?' · '+veh:''}</div>
       <div class="jchips">${chips}</div>
-      <div class="jact"><button class="btn primary" data-act="open">Open ›</button><button class="btn" data-act="route">Map</button></div>
+      <div class="jact"><button class="btn" data-act="route">Show on map ›</button></div>
     </div>`;
   }).join('');
   box.querySelectorAll('.journey').forEach(el=>{
     const j=state.journeys.find(x=>x.id===el.dataset.id);
-    el.querySelector('[data-act="open"]').onclick=()=>openItinerary(j);
-    el.querySelector('[data-act="route"]').onclick=()=>showRoute(j);
+    el.onclick=()=>openItinerary(j);
+    el.querySelector('[data-act="route"]').onclick=e=>{ e.stopPropagation(); showRoute(j); };
   });
 }
 document.getElementById('route-clear').onclick=clearRoute;
@@ -1227,8 +2143,8 @@ function renderItinerary(){
   const esc=v=>(v||'').replace(/"/g,'&quot;');
   const journalRows=j.journal.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map((e,i)=>`<div class="je" data-i="${i}">
       <div class="je-head"><span class="je-date">${e.date?fmtDate(e.date):'Undated'}</span>
-        <span class="je-act"><span class="je-share" data-i="${i}" title="Share">⤴</span><span class="je-del" data-i="${i}" title="Delete">✕</span></span></div>
-      ${e.photo?`<div class="je-photo"><img src="${e.photo}" alt=""/></div>`:''}
+        <span class="je-act"><span class="je-edit" data-i="${i}" title="Edit">✎</span><span class="je-share" data-i="${i}" title="Share">⤴</span><span class="je-del" data-i="${i}" title="Delete">✕</span></span></div>
+      ${e.photo?`<div class="je-photo f-${defaultFrame()}" style="transform:rotate(${[-2.2,1.7,-1.2,2.4,-1.8][i%5]}deg)"><div class="ph"><img src="${e.photo}" alt="${(e.text||'').replace(/"/g,'&quot;').slice(0,80)}"/></div></div>`:''}
       <div class="je-body">${(e.text||'').replace(/</g,'&lt;')||'…'}</div></div>`).join('')
       || '<div class="lead" style="margin:0;font-size:13px">No entries yet — write your first below.</div>';
   const remRows=(j.remember||[]).length ? j.remember.map((r,i)=>`<div class="rem-item"><span>${(r||'').replace(/</g,'&lt;')}</span><span class="rem-del" data-i="${i}" title="Remove">✕</span></div>`).join('')
@@ -1258,7 +2174,7 @@ function renderItinerary(){
   + acc('remember','Remember for next time',`<div class="remember" id="rem-list">${remRows}</div>
       <div class="rem-add"><input id="rem-input" placeholder="e.g. Book Angkor tickets the night before"/><button class="btn" id="rem-add-btn">Add</button></div>`,false)
   + `<div class="iti-card"><div class="iti-actions">
-        <button class="btn primary" id="iti-route">Show route on map ›</button>
+        <button class="btn primary" id="iti-route">Show route ›</button>
         <button class="btn" id="iti-edit">Edit journey</button></div></div>`;
   wireItinerary(j);
 }
@@ -1295,19 +2211,31 @@ function wireItinerary(j){
     const i=j.modes.indexOf(m); if(i>=0) j.modes.splice(i,1); else j.modes.push(m); b.classList.toggle('on'); });
   // stop notes
   document.querySelectorAll('#iti-body .iti-stop textarea').forEach(ta=>ta.oninput=()=>{ j.stops[+ta.dataset.i].notes=ta.value; });
-  // journal — one optional photo per entry (library / camera / files via the OS picker)
-  let draftPhoto=null;
-  const pin=document.getElementById('je-photo');
+  // journal — add / edit entries, each with one optional photo (library / camera / files)
+  let draftPhoto=null, editingEntry=null;
+  const pin=document.getElementById('je-photo'), addBtn=document.getElementById('je-add');
   if(pin) pin.onchange=e=>{ const f=e.target.files[0]; if(!f) return;
     const r=new FileReader(); r.onload=()=>{ draftPhoto=r.result; document.getElementById('je-photo-txt').textContent='✓ Photo attached — change'; }; r.readAsDataURL(f); };
-  document.getElementById('je-add').onclick=()=>{ const d=document.getElementById('je-date').value, t=document.getElementById('je-text').value.trim();
-    if(!t && !draftPhoto){ return; } j.journal.push({date:d,text:t,photo:draftPhoto||null}); renderItinerary(); };
+  addBtn.onclick=()=>{ const d=document.getElementById('je-date').value, t=document.getElementById('je-text').value.trim();
+    if(!t && !draftPhoto && !editingEntry){ return; }
+    if(editingEntry){ Object.assign(editingEntry,{date:d,text:t,photo:draftPhoto}); }
+    else { j.journal.push({date:d,text:t,photo:draftPhoto||null}); }
+    editingEntry=null; renderItinerary(); };
+  document.querySelectorAll('#iti-journal .je-edit').forEach(el=>el.onclick=()=>{ const e=sortedEntry(j,+el.dataset.i);
+    editingEntry=e; draftPhoto=e.photo||null;
+    document.getElementById('je-date').value=e.date||''; document.getElementById('je-text').value=e.text||'';
+    document.getElementById('je-photo-txt').textContent=e.photo?'✓ Photo attached — change':'+ Add a photo';
+    addBtn.textContent='Save changes'; document.getElementById('je-text').focus();
+    document.querySelector('.je-new').scrollIntoView({block:'center'}); });
   document.querySelectorAll('#iti-journal .je-del').forEach(el=>el.onclick=()=>{ const e=sortedEntry(j,+el.dataset.i); j.journal.splice(j.journal.indexOf(e),1); renderItinerary(); });
   document.querySelectorAll('#iti-journal .je-share').forEach(el=>el.onclick=()=>shareJournalEntry(j,sortedEntry(j,+el.dataset.i)));
   document.getElementById('iti-route').onclick=()=>showRoute(j);
   document.getElementById('iti-edit').onclick=()=>openJourneyModal(j);
 }
 function sortedEntry(j,i){ return j.journal.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''))[i]; }
+// each vibe gets its own photo frame (no per-photo picker — keeps it clean)
+const FRAME_BY_VIBE={retro:'polaroid',sleek:'none',disco:'film',earthy:'mat',cute:'tape',classic:'vintage'};
+function defaultFrame(){ return FRAME_BY_VIBE[state.theme]||'mat'; }
 document.getElementById('iti-back').onclick=()=>go('journeys');
 document.getElementById('acc-expand').onclick=()=>document.querySelectorAll('#iti-body .acc').forEach(d=>d.open=true);
 document.getElementById('acc-collapse').onclick=()=>document.querySelectorAll('#iti-body .acc').forEach(d=>d.open=false);
@@ -1321,7 +2249,7 @@ async function shareJournalEntry(j,e){
   try{ await document.fonts.load(`40px ${hand}`); await document.fonts.load(`600 30px ${disp}`); }catch(_){}
   const W=1080, pad=84, innerW=W-pad*2;
   let img=null, photoH=0;
-  if(e.photo){ img=await new Promise(res=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=e.photo; });
+  if(e.photo){ img=await new Promise(res=>{ const im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>res(im); im.onerror=()=>res(null); im.src=e.photo; });
     if(img) photoH=Math.round(innerW*img.height/img.width); }
   const c=document.createElement('canvas'), ctx=c.getContext('2d');
   c.width=W; ctx.font=`40px ${hand}`;
@@ -1387,6 +2315,7 @@ jmSearch.oninput=runJmSearch;
 document.getElementById('jm-x').onclick=()=>document.getElementById('journey-modal').classList.remove('open');
 document.getElementById('journey-modal').onclick=e=>{ if(e.target.id==='journey-modal') e.currentTarget.classList.remove('open'); };
 document.getElementById('new-journey-btn').onclick=()=>openJourneyModal(null);
+document.getElementById('all-routes-btn').onclick=()=>{ if(state.journeys.length) showAllRoutes(); };
 document.getElementById('jm-save').onclick=()=>{
   const name=document.getElementById('jm-name').value.trim()||'Untitled trip';
   const start=document.getElementById('jm-start').value, end=document.getElementById('jm-end').value;
@@ -1444,6 +2373,16 @@ function applyUnits(u,save){
   if(currentItinerary && !document.getElementById('view-itinerary').classList.contains('hidden')) renderItinerary();
 }
 document.querySelectorAll('#units-seg button').forEach(b=>b.onclick=()=>applyUnits(b.dataset.u,true));
+// ---- native country names ----
+function renderNames(){ document.querySelectorAll('#names-seg button').forEach(b=>b.classList.toggle('on', (b.dataset.nn==='1')===!!state.nativeNames)); }
+function applyNames(on,save){
+  state.nativeNames=!!on; if(save){ try{localStorage.setItem('wl_native',on?'1':'0'); }catch(e){} }
+  if(!countryDataLoaded) loadCountryData(); renderNames();
+  if(wsel) paintWorld();
+  const vis=v=>!document.getElementById('view-'+v).classList.contains('hidden');
+  if(vis('account')) renderAccount(); if(vis('lists')){ renderByYear(); renderContinents(); }
+}
+document.querySelectorAll('#names-seg button').forEach(b=>b.onclick=()=>applyNames(b.dataset.nn==='1',true));
 
 // ---------------- share (OS share sheet) ----------------
 function currentMapSvg(){ return document.getElementById('view-world').classList.contains('hidden')
@@ -1481,6 +2420,155 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r=>
   topojson.feature(w,w.objects.countries).features.forEach(f=>NAMES[f.id]=f.properties.name);
   if(!document.getElementById('view-lists').classList.contains('hidden')) renderByYear();
 });
+// ---------------- country data (alpha-2 for flags, native names, continent) ----------------
+const C_A2={}, C_NATIVE={}, C_REGION={}, C_LL={}, CONTINENT_TOTALS={}, C_DATA={}; let countryDataLoaded=false;
+function loadCountryData(){
+  if(countryDataLoaded) return; countryDataLoaded=true;
+  fetch('https://cdn.jsdelivr.net/gh/mledoze/countries@master/dist/countries.json').then(r=>r.json()).then(d=>{
+    d.forEach(c=>{ const id=c.ccn3; if(!id) return;
+      C_A2[id]=(c.cca2||'').toLowerCase(); C_REGION[id]=c.region||'';
+      const nat=c.name&&c.name.native; let nn=''; if(nat){ const k=Object.keys(nat)[0]; nn=nat[k]&&nat[k].common; }
+      C_NATIVE[id]=nn||(c.name&&c.name.common)||'';
+      if(Array.isArray(c.latlng)&&c.latlng.length===2){ C_LL[id]=c.latlng;
+        const cont=contFromLL(c.latlng[0],c.latlng[1]); CONTINENT_TOTALS[cont]=(CONTINENT_TOTALS[cont]||0)+1; }
+      C_DATA[id]={ a2:(c.cca2||'').toLowerCase(), name:(c.name&&c.name.common)||'', official:(c.name&&c.name.official)||'',
+        region:c.region||'', subregion:c.subregion||'', capital:(c.capital||[])[0]||'', population:c.population||0,
+        area:c.area||0, currencies:c.currencies||{}, languages:c.languages||{}, timezones:c.timezones||[], latlng:c.latlng||null }; });
+    // refresh anything visible that uses names/flags/continents
+    const vis=v=>!document.getElementById('view-'+v).classList.contains('hidden');
+    if(vis('account')) renderAccount();
+    if(vis('lists')){ renderLists(); renderLandmarkLists(); renderContinents(); renderByYear(); }
+    if(vis('explore')) renderExplore();
+    // enrich with population + timezones (mledoze omits these) from the dr5hn countries DB — best-effort
+    fetch('https://cdn.jsdelivr.net/gh/dr5hn/countries-states-cities-database@master/json/countries.json').then(r=>r.ok?r.json():null).then(rc=>{
+      if(!rc) return; rc.forEach(c=>{ const id=String(c.numeric_code||'').padStart(3,'0'); if(!id||!C_DATA[id]) return;
+        if(c.population) C_DATA[id].population=+c.population||C_DATA[id].population;
+        if(Array.isArray(c.timezones)&&c.timezones.length) C_DATA[id].timezones=c.timezones.map(t=>t.gmtOffsetName||t.zoneName).filter(Boolean); });
+      if(vis('explore')) renderExplore();
+    }).catch(()=>{});
+  }).catch(()=>{});
+}
+const displayName=id=>(state.nativeNames && C_NATIVE[id]) ? C_NATIVE[id] : (NAMES[id]||(C_DATA[id]&&C_DATA[id].name)||id);
+const flagURL=id=>C_A2[id] ? `https://flagcdn.com/h40/${C_A2[id]}.png` : '';
+
+// ---------------- Explore (every country, up close) ----------------
+const exSearch=document.getElementById('ex-search');
+if(exSearch) exSearch.addEventListener('input',renderExplore);
+function renderExplore(){
+  loadCountryData();
+  const box=document.getElementById('explore-grid'); if(!box) return;
+  const ids=Object.keys(C_DATA);
+  if(!ids.length){ box.innerHTML='<div class="ex-empty">Loading countries…</div>'; return; }
+  const q=(exSearch.value||'').trim().toLowerCase();
+  const list=ids.map(id=>({id,c:C_DATA[id],dn:displayName(id)}))
+    .filter(o=>!q || o.c.name.toLowerCase().includes(q) || (o.dn||'').toLowerCase().includes(q) || o.c.official.toLowerCase().includes(q))
+    .sort((a,b)=>a.dn.localeCompare(b.dn));
+  if(!list.length){ box.innerHTML='<div class="ex-empty">No country matches “'+q+'”.</div>'; return; }
+  box.innerHTML='<div class="ex-grid">'+list.map(o=>{
+    const m=state.marks[o.id], dot=m?`<span class="mk" style="background:${colorFor(m)||'transparent'}"></span>`:'';
+    return `<button class="ex-tab" data-id="${o.id}"><img src="https://flagcdn.com/h40/${o.c.a2}.png" alt="" loading="lazy"/><span>${o.dn}</span>${dot}</button>`;
+  }).join('')+'</div>';
+  box.querySelectorAll('.ex-tab').forEach(el=>el.onclick=()=>openCountry(el.dataset.id));
+}
+function sitesInCountry(id){
+  if(!wfeats) return [];
+  const f=wfeats.find(x=>String(x.id)===String(id)); if(!f) return [];
+  const coord={};
+  (LANDMARKS.parks||[]).forEach(([name,lon,lat])=>coord['parks:'+name]={lon,lat,kind:'park',name:name+' NP'});
+  (LANDMARKS.unesco||[]).forEach(([name,lon,lat])=>coord['unesco:'+name]={lon,lat,kind:'unesco',name});
+  const out=[];
+  for(const k in state.places){ const p=coord[k]; if(!p||p.lon==null) continue;
+    try{ if(d3.geoContains(f,[p.lon,p.lat])) out.push({name:p.name, listId:state.places[k].listId, kind:p.kind}); }catch(e){} }
+  return out;
+}
+function openCountry(id){
+  const c=C_DATA[id]; if(!c) return;
+  const m=document.getElementById('country-modal');
+  const dn=displayName(id), areaMi=Math.round(c.area*0.386102);
+  const langs=Object.values(c.languages||{}).join(', ');
+  const curr=Object.values(c.currencies||{}).map(x=>x.name+(x.symbol?' ('+x.symbol+')':'')).join(', ');
+  const tzs=c.timezones||[], tz=tzs[0]||'—', tzMore=tzs.length>1?` +${tzs.length-1}`:'';
+  const dens=c.area?Math.round(c.population/c.area):0;
+  let fun=''; if(dens) fun=`About ${dens.toLocaleString()} people live in every km² on average.`;
+  if(tzs.length>1) fun+=`${fun?' ':''}It stretches across ${tzs.length} time zones.`;
+  if(!fun) fun=`${dn} sits in ${c.subregion||c.region||'the world'}.`;
+  // logged sites + own status
+  const mk=state.marks[id], statusTxt=mk?(listById(mk.listId)?listById(mk.listId).name:'')+(mk.listId!=='wishlist'&&mk.year?' · '+mk.year:''):'Not logged yet';
+  const sites=sitesInCountry(id);
+  const rs=regionSetForCountry(id);
+  let sitesHTML=`<div class="cm-sites"><b>Your visit</b> — ${statusTxt}.`;
+  if(sites.length){ sitesHTML+=`<div class="chiprow">`+sites.slice(0,12).map(s=>`<span class="schip">${STOP_KINDS[s.kind]||''} ${s.name}</span>`).join('')+`</div>`; }
+  else { sitesHTML+=`<div class="lead" style="margin:6px 0 0;font-size:12px">No parks or UNESCO sites logged here yet.</div>`; }
+  if(rs) sitesHTML+=`<div style="margin-top:8px"><a href="#" id="cm-region" style="color:var(--accent);font-weight:700;font-size:12.5px">Scratch off its ${rs.sub} ›</a></div>`;
+  sitesHTML+=`</div>`;
+  document.getElementById('cm-flagcap').innerHTML=`<img src="https://flagcdn.com/h40/${c.a2}.png" alt=""/><b>${dn}</b>`;
+  const hero=document.getElementById('cm-hero'); hero.style.backgroundImage=''; hero.classList.remove('zoomable');
+  document.getElementById('cm-body').innerHTML=`
+    <div class="cm-sub">
+      <span class="mtag">${ICON('world',13)} ${c.region}${c.subregion?' · '+c.subregion:''}</span>
+      ${c.capital?`<span class="mtag">${ICON('pin',13)} ${c.capital}</span>`:''}
+    </div>
+    <p class="cm-desc" id="cm-desc">Loading a quick intro…</p>
+    <div class="cm-facts">
+      <div id="cm-popl"><b>${c.population?c.population.toLocaleString():'…'}</b><span>Population</span></div>
+      <div><b>${c.area?c.area.toLocaleString()+' km²':'—'}</b><span>${c.area?areaMi.toLocaleString()+' mi²':'Area'}</span></div>
+      <div><b>${curr||'—'}</b><span>Currency</span></div>
+      <div><b>${tz}${tzMore}</b><span>Time zone${tzs.length>1?'s':''}</span></div>
+      <div><b>${langs||'—'}</b><span>Language${Object.keys(c.languages||{}).length>1?'s':''}</span></div>
+      <div id="cm-gdp"><b>…</b><span>GDP / capita · World Bank</span></div>
+    </div>
+    <div class="cm-fun"><b>Fun fact</b>${fun}</div>
+    ${sitesHTML}
+    <div class="cm-actions"><button class="btn primary" id="cm-map">Show on map ›</button></div>
+    <div class="cm-credits">Country facts: <a href="https://github.com/mledoze/countries" target="_blank" rel="noopener">mledoze/countries</a> (ODbL 1.0) · Population &amp; time zones: <a href="https://github.com/dr5hn/countries-states-cities-database" target="_blank" rel="noopener">dr5hn DB</a> (ODbL 1.0) · Photo &amp; intro: <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(c.name)}" target="_blank" rel="noopener">Wikipedia</a> (CC BY-SA 4.0) · Economy: <a href="https://data.worldbank.org" target="_blank" rel="noopener">World Bank Open Data</a> (CC BY 4.0)</div>`;
+  m.classList.add('open');
+  // map button
+  document.getElementById('cm-map').onclick=()=>{ m.classList.remove('open'); go('world');
+    const f=wfeats&&wfeats.find(x=>String(x.id)===String(id)); if(f) setTimeout(()=>{ try{zoomToCountry(f);}catch(e){} },140); };
+  const rl=document.getElementById('cm-region'); if(rl) rl.onclick=e=>{ e.preventDefault(); m.classList.remove('open'); try{openRegion(rs);}catch(e){} };
+  // lazy: hero image + intro from Wikipedia. Priority: capital-city photo > scenic article photo > article thumbnail.
+  const enc=encodeURIComponent(c.name);
+  let heroRank=0;
+  const setHero=(src,rank)=>{ if(!src||rank<=heroRank) return; heroRank=rank; hero.style.backgroundImage=`url("${src}")`; hero.classList.add('zoomable'); hero.dataset.full=src; };
+  const bad=/flag|coat|emblem|orthographic|locator|location|\.svg|\.ogg|\.oga|map|seal of|logo|relief|political|topograph|blank|administ|outline|regions of|districts|province/i;
+  // 1) capital city — its lead image is almost always a real skyline/landmark photo
+  if(c.capital) fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(c.capital)).then(r=>r.ok?r.json():null).then(w=>{
+    if(!w) return; const s=w.originalimage?w.originalimage.source:(w.thumbnail?w.thumbnail.source:'');
+    if(s&&!bad.test(s)) setHero(s,3);
+  }).catch(()=>{});
+  // 2) a scenic photo from the country article's media list
+  fetch('https://en.wikipedia.org/api/rest_v1/page/media-list/'+enc).then(r=>r.ok?r.json():null).then(ml=>{
+    if(!ml||!ml.items) return;
+    const pick=ml.items.find(it=>it.type==='image'&&it.srcset&&it.srcset.length&&it.title&&!bad.test(it.title));
+    if(pick){ let src=pick.srcset[pick.srcset.length-1].src; if(src.startsWith('//')) src='https:'+src; src=src.replace(/\/\d+px-/,'/1280px-'); setHero(src,2); }
+  }).catch(()=>{});
+  // 3) intro text + last-resort image
+  fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+enc).then(r=>r.ok?r.json():null).then(w=>{
+    if(!w) throw 0; const d=document.getElementById('cm-desc'); if(d) d.textContent=w.extract||`${dn} is a country in ${c.region}.`;
+    const src=w.originalimage?w.originalimage.source:(w.thumbnail?w.thumbnail.source:'');
+    if(src&&!bad.test(src)) setTimeout(()=>setHero(src,1),900);
+  }).catch(()=>{ const d=document.getElementById('cm-desc'); if(d) d.textContent=`${dn} is a country in ${c.region}${c.subregion?' ('+c.subregion+')':''}.`; });
+  // lazy: World Bank GDP per capita (most recent value)
+  fetch(`https://api.worldbank.org/v2/country/${c.a2.toUpperCase()}/indicator/NY.GDP.PCAP.CD?format=json&mrnev=1`).then(r=>r.json()).then(j=>{
+    const row=j&&j[1]&&j[1][0], v=row&&row.value, b=document.querySelector('#cm-gdp b');
+    if(b) b.textContent=v?('$'+Math.round(v).toLocaleString()+(row.date?' ('+row.date+')':'')):'—';
+  }).catch(()=>{ const b=document.querySelector('#cm-gdp b'); if(b) b.textContent='—'; });
+  // population fallback via World Bank if REST Countries didn't fill it
+  if(!c.population){
+    fetch(`https://api.worldbank.org/v2/country/${c.a2.toUpperCase()}/indicator/SP.POP.TOTL?format=json&mrnev=1`).then(r=>r.json()).then(j=>{
+      const v=j&&j[1]&&j[1][0]&&j[1][0].value; if(v){ c.population=v; const b=document.querySelector('#cm-popl b'); if(b) b.textContent=Math.round(v).toLocaleString(); }
+    }).catch(()=>{});
+  }
+}
+// country modal close + image lightbox
+(function(){
+  const m=document.getElementById('country-modal'), hero=document.getElementById('cm-hero');
+  document.getElementById('cm-x').onclick=()=>m.classList.remove('open');
+  m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); });
+  hero.addEventListener('click',()=>{ const full=hero.dataset.full; if(!full) return;
+    document.getElementById('cm-light-img').src=full; document.getElementById('cm-light').classList.add('open'); });
+  document.getElementById('cm-light').onclick=function(){ this.classList.remove('open'); };
+})();
 
 window.addEventListener('resize',()=>{ if(!document.getElementById('view-world').classList.contains('hidden')&&wfeats) drawWorld();
   if(!document.getElementById('view-region').classList.contains('hidden')&&rfeats) drawRegion(); });
@@ -1532,11 +2620,35 @@ Object.keys(VIBE_DISPLAY).forEach(vibe=>{
 });
 // paint our own line-icons into every static [data-icon] slot (no emoji)
 document.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML=ICON(el.dataset.icon, +(el.dataset.isz)||18); });
+// ---------------- persistence: everything you log survives reloads ----------------
+function saveState(){ try{ localStorage.setItem('wl_data',JSON.stringify({
+  marks:state.marks, regionMarks:state.regionMarks, places:state.places,
+  lists:state.lists, journeys:state.journeys, year:state.year, extraUnesco:state.extraUnesco, airports:state.airports })); }catch(e){} }
+function loadState(){ try{ const d=JSON.parse(localStorage.getItem('wl_data')||'null'); if(!d) return;
+  if(d.marks) state.marks=d.marks; if(d.regionMarks) state.regionMarks=d.regionMarks; if(d.places) state.places=d.places;
+  if(d.lists) state.lists=d.lists; if(Array.isArray(d.journeys)) state.journeys=d.journeys; if(d.year) state.year=d.year;
+  if(d.airports) state.airports=d.airports;
+  if(Array.isArray(d.extraUnesco)){ state.extraUnesco=d.extraUnesco;
+    d.extraUnesco.forEach(e=>{ if(!LANDMARKS.unesco.some(([n])=>n===e[0])) LANDMARKS.unesco.push(e); }); }
+}catch(e){} }
+loadState();
+loadCountryData();
+let savedNative=false; try{ savedNative=localStorage.getItem('wl_native')==='1'; }catch(e){} state.nativeNames=savedNative;
+setInterval(saveState,3000);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveState(); });
+window.addEventListener('pagehide',saveState);
+
 applyTheme(savedTheme,false);
 let savedUnits='mi'; try{ savedUnits=localStorage.getItem('wl_units')||'mi'; }catch(e){} applyUnits(savedUnits,false);
+// seed already-earned badges silently on first run, so only NEW achievements pop
+try{ if(localStorage.getItem('wl_badges')===null) localStorage.setItem('wl_badges',JSON.stringify(BADGES.filter(b=>b.test()).map(b=>b.id))); }catch(e){}
 updatePaintFab();
+document.getElementById('share-passport-btn').onclick=openQR;
+document.getElementById('share-card-btn').onclick=openCard;
+document.getElementById('livemap-btn').onclick=openLiveMap;
 const startView=(location.hash||'').replace('#','');
-if(['regions','lists','account'].includes(startView)) go(startView); else ensureWorld();
+if(['regions','lists','account','timeline'].includes(startView)) go(startView); else ensureWorld();
+maybeShowShared();
 </script>
 </body>
 </html>

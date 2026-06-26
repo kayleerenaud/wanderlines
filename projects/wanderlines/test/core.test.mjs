@@ -2,6 +2,7 @@
 import {
   haversineKm, groundCoveredKm, daysBetween, journeyStats,
   kmToMi, formatDistance, THEMES, THEME_ORDER, REQUIRED_TOKENS, STOP_KINDS,
+  LISTS, visitsOf, primaryVisit, syncPrimary, isWish, markColor, yearsTravelled,
 } from "../src/core.mjs";
 import { JOURNEYS } from "../src/data.mjs";
 import { icon, ICON_PATHS, VEHICLES, STOP_ICON } from "../src/icons.mjs";
@@ -59,6 +60,27 @@ ok("9 vehicles, each with a path", VEHICLES.length === 9 && VEHICLES.every((v) =
 ok("6 stop kinds map to icons", STOP_KINDS.every((k) => ICON_PATHS[STOP_ICON[k]]));
 ok("icon() returns an <svg>", icon("plane", 20).startsWith("<svg") && icon("plane").includes("currentColor"));
 ok("no emoji leaked into icon paths", !/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(Object.values(ICON_PATHS).join("")));
+
+// multi-visit model
+const legacy = { listId: "visited", year: 2018 };
+ok("visitsOf falls back to a legacy single visit", visitsOf(legacy).length === 1 && visitsOf(legacy)[0].year === 2018);
+ok("visitsOf returns the visits array when present",
+  visitsOf({ visits: [{ listId: "visited", year: 2017 }, { listId: "lived", year: 2021 }] }).length === 2);
+
+const multi = { visits: [{ listId: "visited", year: 2017 }, { listId: "lived", year: 2021 }] };
+ok("primary visit prefers higher-priority list (lived > visited)", primaryVisit(multi).listId === "lived");
+ok("primary visit breaks list ties by latest year",
+  primaryVisit({ visits: [{ listId: "visited", year: 2012 }, { listId: "visited", year: 2020 }] }).year === 2020);
+ok("syncPrimary mirrors listId/year onto the mark", (() => { const m = { visits: multi.visits.slice() }; syncPrimary(m); return m.listId === "lived" && m.year === 2021; })());
+
+ok("a mark with any non-wish visit is not wish", isWish(multi) === false);
+ok("a wish-only mark is wish", isWish({ visits: [{ listId: "wishlist", year: 0 }] }) === true);
+ok("markColor uses the primary list colour", markColor(multi) === LISTS.find((l) => l.id === "lived").color);
+ok("markColor is null for wish-only", markColor({ listId: "wishlist" }) === null);
+
+ok("yearsTravelled counts distinct non-wish years across marks",
+  yearsTravelled({ a: multi, b: { listId: "visited", year: 2021 }, c: { listId: "wishlist", year: 2099 } }) === 2); // 2017, 2021; wish + dup excluded
+ok("three default lists incl. one wish", LISTS.length === 3 && LISTS.filter((l) => l.wish).length === 1);
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

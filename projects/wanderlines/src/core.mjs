@@ -110,3 +110,81 @@ export const THEMES = {
 };
 
 export const THEME_ORDER = ["retro", "sleek", "disco", "earthy", "cute", "classic"];
+
+// ---------------------------------------------------------------------------
+// Multi-visit model
+//
+// A logged location can hold SEVERAL visits, each its own {listId, year}.
+// The map paints by the "primary" visit: the highest-priority list
+// (lived > visited > other > wish), breaking ties by the most recent year.
+// `listId`/`year` on a mark mirror that primary so single-value consumers keep
+// working. These are the same rules the prototype uses, verified here.
+// ---------------------------------------------------------------------------
+
+export const LISTS = [
+  { id: "lived", name: "Lived", color: "#b5532a" },
+  { id: "visited", name: "Visited", color: "#1f6f6b" },
+  { id: "wishlist", name: "Wish List", color: null, wish: true },
+];
+
+const listById = (lists, id) => lists.find((l) => l.id === id);
+
+/** Every visit on a mark; falls back to a single {listId, year} for legacy marks. */
+export function visitsOf(mark) {
+  if (!mark) return [];
+  if (Array.isArray(mark.visits) && mark.visits.length) return mark.visits;
+  return [{ listId: mark.listId, year: mark.year }];
+}
+
+/** Priority of a list: lived (3) > visited/other (2) > unknown (1) > wish (0). */
+export function listRank(id, lists = LISTS) {
+  const l = listById(lists, id);
+  if (!l) return 1;
+  if (l.wish) return 0;
+  if (l.id === "lived") return 3;
+  return 2;
+}
+
+/** The representative visit a mark is painted/sorted by. */
+export function primaryVisit(mark, lists = LISTS) {
+  const vs = visitsOf(mark);
+  if (!vs.length) return null;
+  return vs.slice().sort((a, b) => {
+    const r = listRank(b.listId, lists) - listRank(a.listId, lists);
+    return r || (+b.year || 0) - (+a.year || 0);
+  })[0];
+}
+
+/** Mirror listId/year onto the mark's primary visit (returns the mark). */
+export function syncPrimary(mark, lists = LISTS) {
+  if (!mark) return mark;
+  const p = primaryVisit(mark, lists);
+  if (p) { mark.listId = p.listId; mark.year = p.year; }
+  return mark;
+}
+
+/** A mark is "wish" only when its primary visit is a wish-list visit. */
+export function isWish(mark, lists = LISTS) {
+  const p = primaryVisit(mark, lists);
+  const l = p && listById(lists, p.listId);
+  return !!(l && l.wish);
+}
+
+/** The scratch-off colour for a mark (null for wish / unknown). */
+export function markColor(mark, lists = LISTS) {
+  const p = primaryVisit(mark, lists);
+  const l = p && listById(lists, p.listId);
+  return l && !l.wish ? l.color : null;
+}
+
+/** Distinct non-wish years across all marks — the "years travelled" stat. */
+export function yearsTravelled(marks, lists = LISTS) {
+  const ys = new Set();
+  Object.values(marks || {}).forEach((m) =>
+    visitsOf(m).forEach((v) => {
+      const l = listById(lists, v.listId);
+      if (v.year && !(l && l.wish)) ys.add(v.year);
+    })
+  );
+  return ys.size;
+}
