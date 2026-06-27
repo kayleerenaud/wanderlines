@@ -227,6 +227,19 @@
   .help-row .ht small{color:var(--muted);font-size:12px}
   .help-done{margin-top:16px;width:100%;justify-content:center;padding:12px;font-size:14px}
   .help-tip{text-align:center;font-size:11px;color:var(--muted);margin-top:9px}
+  /* on a wider (desktop) screen, lay the help steps out in two columns so they fit without scrolling */
+  @media(min-width:640px){
+    .help-card{max-width:700px;padding:26px 28px 22px}
+    .help-rows{display:grid;grid-template-columns:1fr 1fr;column-gap:26px;row-gap:2px}
+    .help-row{border-top:none;padding:9px 2px}
+  }
+  /* auth: brief "signing you in" state so the form doesn't flash for already-logged-in users */
+  .auth-loading{display:none;flex-direction:column;align-items:center;gap:14px}
+  #auth.checking .auth-card{display:none}
+  #auth.checking .auth-loading{display:flex}
+  .auth-loading .spin{width:34px;height:34px;border:3px solid color-mix(in srgb,var(--ink) 18%,transparent);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  .auth-loading .lbl{font-size:13px;letter-spacing:.04em;color:var(--muted)}
+  @keyframes spin{to{transform:rotate(360deg)}}
 
   /* ---------- map top controls: search + layers ---------- */
   .mapctl{position:absolute;top:10px;left:12px;right:12px;display:flex;gap:8px;z-index:9;align-items:flex-start}
@@ -799,6 +812,7 @@
 
 <!-- ---------- auth gate ---------- -->
 <div id="auth">
+  <div class="auth-loading"><div class="spin"></div><div class="lbl">Signing you in…</div></div>
   <div class="auth-card">
     <div class="auth-brand"><div class="b">Wanderlines</div><small>✦ places i've been ✦</small></div>
     <h3 id="auth-title">Sign in</h3>
@@ -928,6 +942,7 @@
   <div class="help-card">
     <h2>How it works</h2>
     <div class="hsub">Wanderlines</div>
+    <div class="help-rows">
     <div class="help-row"><div class="hic" data-icon="tap"></div><div class="ht"><b>Tap a country</b><small>Its name pops up and the color cycles: Visited → Lived → Wish List → clear.</small></div></div>
     <div class="help-row"><div class="hic" data-icon="hold"></div><div class="ht"><b>Press &amp; hold</b><small>Opens details to change the list, set the year, or add notes.</small></div></div>
     <div class="help-row"><div class="hic" data-icon="search"></div><div class="ht"><b>Search</b><small>Find a country, state/province, National Park, UNESCO site or airport and jump to it.</small></div></div>
@@ -937,12 +952,19 @@
     <div class="help-row"><div class="hic" data-icon="calendar"></div><div class="ht"><b>Timeline</b><small>See when you went where, by year. Pinch to add cities &amp; landmarks.</small></div></div>
     <div class="help-row"><div class="hic" data-icon="person"></div><div class="ht"><b>Passport &amp; vibes</b><small>Account holds your stamps, flags &amp; badges, 6 vibes, miles/km, and native names.</small></div></div>
     <div class="help-row"><div class="hic" data-icon="menu"></div><div class="ht"><b>Menu</b><small>Switch screens. Tap the logo any time to come home.</small></div></div>
+    </div>
     <button class="btn primary help-done" id="help-done">Got it</button>
     <div class="help-tip">…or tap anywhere to close</div>
   </div>
 </div>
 
 <script>
+// Don't flash the sign-in form for someone who's already (or about to be) signed in:
+// show the "Signing you in…" state instead until we confirm the session.
+try{ var _au=document.getElementById('auth');
+  if(_au && (/[#&?](access_token|code|error)=/.test(location.hash+location.search) || localStorage.getItem('sb-dkwhsvrgounkzwxncgmv-auth-token')))
+    _au.classList.add('checking');
+}catch(e){}
 // ---------------- state ----------------
 const state = {
   lists: [
@@ -989,6 +1011,10 @@ const SEED = {'840':['lived',2015],'124':['visited',2019],'076':['visited',2023]
   '826':['visited',2017],'250':['visited',2017],'724':['visited',2022],'392':['visited',2024],
   '356':['wishlist',2026],'036':['wishlist',2026],'152':['lived',2020],'484':['visited',2018]};
 Object.entries(SEED).forEach(([k,v])=>state.marks[k]={listId:v[0],year:v[1]});
+// Snapshot the onboarding defaults so a brand-new account can start clean (no demo countries),
+// while still keeping the one example journey to show how it works.
+const SEED_JOURNEYS = JSON.parse(JSON.stringify(state.journeys));
+const DEFAULT_LISTS = JSON.parse(JSON.stringify(state.lists));
 
 // hover-to-name is for real pointers only; on touch we use tap-to-reveal instead
 const HOVER = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
@@ -2735,6 +2761,18 @@ function hydrateFromCloud(obj){
   seenBadges=new Set(); BADGES.forEach(b=>{ try{ if(b.test()) seenBadges.add(b.id); }catch(_){} });
   if(typeof wsel!=='undefined' && wsel) paintWorld();
 }
+// A brand-new account starts with a clean map (no demo countries), but keeps the one example journey.
+function freshStartState(){
+  state.marks={}; state.regionMarks={}; state.places={}; state.airports={}; state.extraUnesco=[];
+  state.journeys = JSON.parse(JSON.stringify(SEED_JOURNEYS));
+  state.lists = JSON.parse(JSON.stringify(DEFAULT_LISTS));
+  // re-apply the current vibe's scratch colors onto the freshly-reset lists
+  try{ const cs=getComputedStyle(document.documentElement), lv=cs.getPropertyValue('--c-lived').trim(), vs=cs.getPropertyValue('--c-visited').trim();
+    const L=listById('lived'), V=listById('visited'); if(L&&lv)L.color=lv; if(V&&vs)V.color=vs; }catch(e){}
+  saveStateLocal();
+  seenBadges=new Set(); BADGES.forEach(b=>{ try{ if(b.test()) seenBadges.add(b.id); }catch(_){} });
+  if(typeof wsel!=='undefined' && wsel) paintWorld();
+}
 async function loadCloudInto(){
   if(!sb||!cloudUser) return false;
   try{ const {data,error}=await sb.from('user_data').select('data').eq('user_id',cloudUser.id).maybeSingle();
@@ -2752,13 +2790,16 @@ async function onSignedIn(session){
   cloudUser=session.user; state.user=session.user.email||'';
   const ae=$('acct-email'); if(ae) ae.value=state.user;
   $('auth').classList.add('hidden');  // unlock the app immediately so a slow cloud read never traps you on the login screen
+  $('auth').classList.remove('checking');
   authMsg('');
   try{ history.replaceState(null,'',location.pathname); }catch(e){}   // strip the #access_token from the address bar
-  try{ await loadCloudInto(); }catch(e){}   // pull this account's map (no-op for a brand-new account)
+  let had=false; try{ had=await loadCloudInto(); }catch(e){}   // pull this account's map
+  if(!had) freshStartState();         // brand-new account: clean map (keeps the example journey)
   pushCloud();                        // make sure a row exists for this user
   const vis=v=>document.getElementById('view-'+v)&&!document.getElementById('view-'+v).classList.contains('hidden');
   if(vis('account')) renderAccount();
-  if(vis('world')) paintWorld();
+  if(vis('journeys')) renderJourneys();
+  if(typeof wsel!=='undefined' && wsel) paintWorld();
   let seen=false; try{ seen=localStorage.getItem('wl_seen_help')==='1'; }catch(e){}
   if(!seen){ try{ localStorage.setItem('wl_seen_help','1'); }catch(e){} setTimeout(()=>$('help').classList.add('open'),550); }
 }
@@ -2856,11 +2897,12 @@ maybeShowShared();
 
 // Restore an existing login (sessions persist across reloads + devices) and react to sign-in events.
 (function(){
-  if(!sb){ authMsg('Working offline — sign in to sync once you reconnect.'); return; }
+  const showForm=()=>{ const a=document.getElementById('auth'); if(a) a.classList.remove('checking'); };
+  if(!sb){ showForm(); authMsg('Working offline — sign in to sync once you reconnect.'); return; }
   // Surface any error Google/Supabase handed back in the redirect URL so we're never silently stuck.
   try{ const blob=(location.hash||'')+'&'+(location.search||'');
     const em=/[#&?]error_description=([^&]+)/.exec(blob)||/[#&?]error=([^&]+)/.exec(blob);
-    if(em) authMsg('Sign-in error: '+decodeURIComponent(em[1].replace(/\+/g,' ')),'err');
+    if(em){ showForm(); authMsg('Sign-in error: '+decodeURIComponent(em[1].replace(/\+/g,' ')),'err'); }
   }catch(e){}
   sb.auth.onAuthStateChange((event,session)=>{
     if(session && (event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION') && (!cloudUser || cloudUser.id!==session.user.id)) onSignedIn(session);
@@ -2868,8 +2910,9 @@ maybeShowShared();
   // Poll briefly for a session (covers the moment right after the OAuth redirect lands).
   let tries=0; (function check(){ sb.auth.getSession().then(({data})=>{
     if(data&&data.session){ if(!cloudUser) onSignedIn(data.session); }
-    else if(++tries<6) setTimeout(check,400);
-  }).catch(()=>{}); })();
+    else if(++tries<8) setTimeout(check,350);
+    else showForm();   // no session after polling -> reveal the sign-in form
+  }).catch(()=>showForm()); })();
 })();
 </script>
 </body>
