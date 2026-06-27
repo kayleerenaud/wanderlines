@@ -2357,7 +2357,7 @@ function renderItinerary(){
       <div class="field"><label>Best eats</label><input id="rv-eats" placeholder="A meal or spot worth remembering…" value="${esc(j.review.eats)}"/></div>
       <div class="field"><label>Where we stayed</label><input id="rv-stay" placeholder="Place or area (would you stay again?)" value="${esc(j.review.stay)}"/></div>
       <div class="rev-q"><div class="mini-lbl">Would you go back?</div>
-        <div class="seg" id="rv-return">${[['yes','Yes'],['maybe','Maybe'],['no','Been there']].map(([v,l])=>`<button data-v="${v}" class="${j.review.returnq===v?'on':''}">${l}</button>`).join('')}</div></div>`,false)
+        <div class="seg" id="rv-return">${[['yes','Yes'],['maybe','Maybe'],['no','Not a chance']].map(([v,l])=>`<button data-v="${v}" class="${j.review.returnq===v?'on':''}">${l}</button>`).join('')}</div></div>`,false)
   + acc('remember','Remember for next time',`<div class="remember" id="rem-list">${remRows}</div>
       <div class="rem-add"><input id="rem-input" placeholder="e.g. Book Angkor tickets the night before"/><button class="btn" id="rem-add-btn">Add</button></div>`,false)
   + `<div class="iti-card"><div class="iti-actions">
