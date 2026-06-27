@@ -2291,7 +2291,18 @@ document.getElementById('route-clear').onclick=clearRoute;
 // click the journey name in the route banner → back to that journey's page; ✕ → full map
 document.getElementById('route-name').onclick=()=>{ if(state.activeRoute) openItinerary(state.activeRoute); };
 
-// ---- journey detail page (personal log: stats, review, companions, vehicles, memories, journal) ----
+// One-time migration: old per-stop "memories" notes become standalone journal entries
+// ("<Stop name>! <the note>"), so nothing is lost now that Route is just the route.
+// Idempotent: it clears each note as it moves it, so running on every load is safe.
+function migrateStopNotesToJournal(){
+  let changed=false;
+  (state.journeys||[]).forEach(j=>{ j.journal=j.journal||[];
+    (j.stops||[]).forEach(s=>{ const n=(s.notes||'').trim(); if(n){
+      j.journal.push({date:j.start||'', text:s.name+'! '+n, photo:null}); s.notes=''; changed=true; } }); });
+  if(changed) saveState();
+  return changed;
+}
+// ---- journey detail page (personal log: stats, review, companions, vehicles, journal) ----
 let currentItinerary=null;
 const VEHICLES=[['car',ICON('car',22),'Car'],['bus',ICON('bus',22),'Bus'],['train',ICON('train',22),'Train'],['walking',ICON('walking',22),'Walking'],
   ['biking',ICON('biking',22),'Biking'],['boat',ICON('boat',22),'Boat'],['horseback',ICON('horseback',22),'Horseback'],['cruise',ICON('cruise',22),'Cruise'],['plane',ICON('plane',22),'Plane']];
@@ -2315,8 +2326,7 @@ function renderItinerary(){
         <input data-f="age" placeholder="Age" inputmode="numeric" value="${t.age||''}"/></div>
       <span class="trm" title="Remove">✕</span></div>`).join('');
   const stopRows=j.stops.map((s,i)=>`<div class="iti-stop" data-i="${i}">
-      <div class="sh"><span class="seq">${i+1}</span>${STOP_KINDS[s.kind]||ICON('pin',16)} ${s.name}</div>
-      <textarea data-i="${i}" placeholder="Memories, restaurants, where you stayed, what to remember…">${(s.notes||'').replace(/</g,'&lt;')}</textarea></div>`).join('')
+      <div class="sh"><span class="seq">${i+1}</span>${STOP_KINDS[s.kind]||ICON('pin',16)} ${s.name}</div></div>`).join('')
       || '<div class="lead" style="margin:0;font-size:13px">No stops yet. Tap “Edit journey” to add some.</div>';
   const esc=v=>(v||'').replace(/"/g,'&quot;');
   const journalRows=j.journal.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map((e,i)=>`<div class="je" data-i="${i}">
@@ -2335,7 +2345,7 @@ function renderItinerary(){
   // intuitive order: overview → the route → who & how → your journal → reflection → notes for next time
   document.getElementById('iti-body').innerHTML=
     acc('overview','This journey',`<div class="stats" style="grid-template-columns:1fr 1fr">${stats.map(s=>`<div class="statbox"><div class="n">${s[0]}</div><div class="l">${s[1]}</div></div>`).join('')}</div>`,true)
-  + acc('route','Route & memories',stopRows,false)
+  + acc('route','Route',stopRows,false)
   + acc('who','Who came along',`${travRows}<button class="btn addbtn" id="iti-addtrav">+ Add traveler</button>`,false)
   + acc('around','How you got around',`<div class="vehicles" id="iti-veh">${VEHICLES.map(([k,ic,lbl])=>`<button data-m="${k}" class="veh ${j.modes.includes(k)?'on':''}" title="${lbl}"><span class="vic">${ic}</span><span class="vlb">${lbl}</span></button>`).join('')}</div>`,false)
   + acc('journal','Journal',`<div id="iti-journal">${journalRows}</div>
@@ -2387,8 +2397,6 @@ function wireItinerary(j){
   // vehicles (multi-select)
   document.querySelectorAll('#iti-veh .veh').forEach(b=>b.onclick=()=>{ const m=b.dataset.m;
     const i=j.modes.indexOf(m); if(i>=0) j.modes.splice(i,1); else j.modes.push(m); b.classList.toggle('on'); });
-  // stop notes
-  document.querySelectorAll('#iti-body .iti-stop textarea').forEach(ta=>ta.oninput=()=>{ j.stops[+ta.dataset.i].notes=ta.value; });
   // journal - add / edit entries, each with one optional photo (library / camera / files)
   let draftPhoto=null, editingEntry=null;
   const pin=document.getElementById('je-photo'), addBtn=document.getElementById('je-add');
@@ -2950,6 +2958,7 @@ async function onSignedIn(session){
   try{ history.replaceState(null,'',location.pathname); }catch(e){}   // strip the #access_token from the address bar
   let had=false; try{ had=await loadCloudInto(); }catch(e){}   // pull this account's map
   if(!had) freshStartState();         // brand-new account: clean map (keeps the example journey)
+  else migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journal
   pushCloud();                        // make sure a row exists for this user
   const vis=v=>document.getElementById('view-'+v)&&!document.getElementById('view-'+v).classList.contains('hidden');
   if(vis('account')) renderAccount();
@@ -3030,6 +3039,7 @@ function loadState(){ try{ const d=JSON.parse(localStorage.getItem('wl_data')||'
     d.extraUnesco.forEach(e=>{ if(!LANDMARKS.unesco.some(([n])=>n===e[0])) LANDMARKS.unesco.push(e); }); }
 }catch(e){} }
 loadState();
+migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journal on local load
 loadCountryData();
 let savedNative=false; try{ savedNative=localStorage.getItem('wl_native')==='1'; }catch(e){} state.nativeNames=savedNative;
 setInterval(saveState,3000);
