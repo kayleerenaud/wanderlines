@@ -2726,7 +2726,7 @@ $('auth-toggle').onclick=()=>setAuthMode(authMode==='signin'?'signup':'signin');
 // ---------------- Supabase backend: real accounts + cross-device sync ----------------
 const SB_URL='https://dkwhsvrgounkzwxncgmv.supabase.co';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrd2hzdnJnb3Vua3p3eG5jZ212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MTQwODgsImV4cCI6MjA5ODA5MDA4OH0.reI4vPEe5WrohcKgmSoPSV3d0z58hJrnm2vNIYNCfic';
-const sb = (window.supabase && SB_URL && SB_ANON) ? window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } }) : null;
+const sb = (window.supabase && SB_URL && SB_ANON) ? window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:'implicit' } }) : null;
 let cloudUser=null, cloudPushTimer=null, GOOGLE_READY=false;
 function authMsg(t,kind){ const el=$('auth-msg'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; el.style.color=(kind==='err')?'var(--accent)':'var(--muted)'; }
 
@@ -2865,10 +2865,19 @@ maybeShowShared();
 // Restore an existing login (sessions persist across reloads + devices) and react to sign-in events.
 (function(){
   if(!sb){ authMsg('Working offline — sign in to sync once you reconnect.'); return; }
-  sb.auth.getSession().then(({data})=>{ if(data&&data.session) onSignedIn(data.session); }).catch(()=>{});
+  // Surface any error Google/Supabase handed back in the redirect URL so we're never silently stuck.
+  try{ const blob=(location.hash||'')+'&'+(location.search||'');
+    const em=/[#&?]error_description=([^&]+)/.exec(blob)||/[#&?]error=([^&]+)/.exec(blob);
+    if(em) authMsg('Sign-in error: '+decodeURIComponent(em[1].replace(/\+/g,' ')),'err');
+  }catch(e){}
   sb.auth.onAuthStateChange((event,session)=>{
-    if((event==='SIGNED_IN'||event==='TOKEN_REFRESHED') && session && (!cloudUser || cloudUser.id!==session.user.id)) onSignedIn(session);
+    if(session && (event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION') && (!cloudUser || cloudUser.id!==session.user.id)) onSignedIn(session);
   });
+  // Poll briefly for a session (covers the moment right after the OAuth redirect lands).
+  let tries=0; (function check(){ sb.auth.getSession().then(({data})=>{
+    if(data&&data.session){ if(!cloudUser) onSignedIn(data.session); }
+    else if(++tries<6) setTimeout(check,400);
+  }).catch(()=>{}); })();
 })();
 </script>
 <script>
