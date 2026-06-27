@@ -622,6 +622,11 @@
   .visit-when .visit-year:focus{outline:none;border-color:var(--accent)}
   .visit-rm{color:var(--muted);cursor:pointer;font-size:15px;padding:4px 6px;flex:none}
   .visit-rm:hover{color:var(--accent)}
+  .visit-when .visit-month,.visit-to select{border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:10px;padding:8px 8px;font:inherit;font-size:13.5px;flex:none}
+  .visit-when .visit-month:focus,.visit-to select:focus,.visit-to input:focus{outline:none;border-color:var(--accent)}
+  .visit-to{display:flex;align-items:center;gap:8px;margin-top:8px;padding-left:2px}
+  .visit-to .to-lbl{font-size:12px;color:var(--muted);flex:none}
+  .visit-to input{flex:1;border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:10px;padding:8px 11px;font:inherit;font-size:14px;min-width:0}
   #detail textarea{width:100%;border:1px solid var(--rule);background:var(--field);border-radius:8px;padding:10px 12px;
     font:inherit;font-size:13px;resize:vertical;min-height:62px}
   .detail-actions{display:flex;gap:10px;margin-top:16px}
@@ -1077,9 +1082,15 @@ document.addEventListener('contextmenu',e=>{ if(e.target.closest('svg.map')) e.p
 let detailCtx=null, detailSel=null;
 const D=id=>document.getElementById(id);
 let draftVisits=[];
+const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function monthOptions(sel){ let o='<option value="">Month</option>'; for(let i=1;i<=12;i++) o+=`<option value="${i}" ${+sel===i?'selected':''}>${MONTHS[i]}</option>`; return o; }
+// Format a visit's date(s): "Mar 2017", "2017", or for a lived range "Mar 2015 – Jun 2018".
+function visitLabel(v){ if(!v) return ''; const s=(v.month?MONTHS[v.month]+' ':'')+(v.year||'');
+  if(v.listId==='lived' && v.endYear){ const e=(v.endMonth?MONTHS[v.endMonth]+' ':'')+v.endYear; return s+' – '+e; }
+  return s; }
 function openDetail(ctx){
   detailCtx=ctx; const m=ctx.get();
-  draftVisits = m ? visitsOf(m).map(v=>({listId:v.listId||'visited', year:+v.year||state.year})) : [{listId:state.active||'visited', year:state.year}];
+  draftVisits = m ? visitsOf(m).map(v=>({listId:v.listId||'visited', year:+v.year||state.year, month:+v.month||0, endYear:+v.endYear||0, endMonth:+v.endMonth||0})) : [{listId:state.active||'visited', year:state.year, month:0, endYear:0, endMonth:0}];
   D('detail-title').textContent=ctx.name||'Place';
   D('detail-notes').value = m ? (m.notes||'') : '';
   D('detail-remove').style.display = m ? '' : 'none';
@@ -1092,12 +1103,20 @@ function renderDetailVisits(){
     <div class="visit-row" data-i="${i}">
       <div class="lchips">${state.lists.map(l=>
         `<div class="lchip ${l.id===v.listId?'sel':''}" data-li="${l.id}"><span class="sw ${l.wish?'wish':''}" style="${l.wish?'':'background:'+l.color}"></span>${l.name}</div>`).join('')}</div>
-      <div class="visit-when"><input type="number" class="visit-year" min="1900" max="2100" value="${v.year}" placeholder="Year"/>
+      <div class="visit-when">
+        <select class="visit-month">${monthOptions(v.month)}</select>
+        <input type="number" class="visit-year" min="1900" max="2100" value="${v.year}" placeholder="Year"/>
         ${draftVisits.length>1?`<span class="visit-rm" title="Remove this date">✕</span>`:''}</div>
+      ${v.listId==='lived'?`<div class="visit-to"><span class="to-lbl">until</span>
+        <select class="visit-emonth">${monthOptions(v.endMonth)}</select>
+        <input type="number" class="visit-eyear" min="1900" max="2100" value="${v.endYear||''}" placeholder="Year (blank = present)"/></div>`:''}
     </div>`).join('');
   box.querySelectorAll('.visit-row').forEach(row=>{ const i=+row.dataset.i;
     row.querySelectorAll('.lchip').forEach(c=>c.onclick=()=>{ draftVisits[i].listId=c.dataset.li; renderDetailVisits(); });
     const yr=row.querySelector('.visit-year'); yr.oninput=()=>{ draftVisits[i].year=+yr.value||state.year; };
+    const mo=row.querySelector('.visit-month'); mo.onchange=()=>{ draftVisits[i].month=+mo.value||0; };
+    const ey=row.querySelector('.visit-eyear'); if(ey) ey.oninput=()=>{ draftVisits[i].endYear=+ey.value||0; };
+    const em=row.querySelector('.visit-emonth'); if(em) em.onchange=()=>{ draftVisits[i].endMonth=+em.value||0; };
     const rm=row.querySelector('.visit-rm'); if(rm) rm.onclick=()=>{ draftVisits.splice(i,1); renderDetailVisits(); };
   });
 }
@@ -1113,9 +1132,10 @@ function openRegionDetail(d){ const code=curRegion.code, k=curRegion.keyFn(d); o
 D('detail-x').onclick=closeDetail;
 D('detail').onclick=e=>{ if(e.target.id==='detail') closeDetail(); };
 D('detail-add-visit').onclick=()=>{ const last=draftVisits[draftVisits.length-1];
-  draftVisits.push({listId:(last&&last.listId)||'visited', year:(last&&+last.year? +last.year+1 : state.year)}); renderDetailVisits(); };
+  draftVisits.push({listId:(last&&last.listId)||'visited', year:(last&&+last.year? +last.year+1 : state.year), month:0, endYear:0, endMonth:0}); renderDetailVisits(); };
 D('detail-save').onclick=()=>{ if(!detailCtx)return;
-  const visits=draftVisits.map(v=>({listId:v.listId, year:+v.year||state.year})).filter(v=>v.listId);
+  const visits=draftVisits.map(v=>{ const o={listId:v.listId, year:+v.year||state.year}; if(v.month) o.month=+v.month;
+    if(v.listId==='lived'){ if(v.endYear) o.endYear=+v.endYear; if(v.endYear&&v.endMonth) o.endMonth=+v.endMonth; } return o; }).filter(v=>v.listId);
   if(!visits.length){ detailCtx.set(null); }
   else { const m={ visits, notes:D('detail-notes').value.trim() }; syncPrimary(m); detailCtx.set(m); }
   detailCtx.repaint(); closeDetail(); };
@@ -1549,6 +1569,7 @@ const REGION_SETS=[
   {code:'FR', cid:'250', name:'France', sub:'departments', kind:'geo', src:CTH+'france-departments.geojson'},
   {code:'CH', cid:'756', name:'Switzerland', sub:'26 cantons', kind:'geo', src:CTH+'switzerland.geojson'},
   {code:'RU', cid:'643', name:'Russia', sub:'federal subjects', kind:'geo', src:CTH+'russia.geojson'},
+  {code:'GB', cid:'826', name:'United Kingdom', sub:'nations &amp; English regions', kind:'geo', src:'https://cdn.jsdelivr.net/gh/reeeneeee/wanderlines@master/docs/data/uk-regions.geojson'},
 ];
 const regionSetForCountry=id=>REGION_SETS.find(r=>r.cid===id);
 function renderRegions(){
@@ -2486,12 +2507,29 @@ document.getElementById('all-routes-btn').onclick=()=>{ if(state.journeys.length
 document.getElementById('jm-save').onclick=()=>{
   const name=document.getElementById('jm-name').value.trim()||'Untitled trip';
   const start=document.getElementById('jm-start').value, end=document.getElementById('jm-end').value;
-  if(editingJourney){ Object.assign(editingJourney,{name,start,end,stops:draftStops.slice()}); }
-  else { const nj={id:'j'+Math.round(performance.now()), name, start, end, mode:'car', lang:'', travelers:[], stops:draftStops.slice()}; state.journeys.unshift(nj); }
+  let saved;
+  if(editingJourney){ Object.assign(editingJourney,{name,start,end,stops:draftStops.slice()}); saved=editingJourney; }
+  else { const nj={id:'j'+Math.round(performance.now()), name, start, end, mode:'car', lang:'', travelers:[], stops:draftStops.slice()}; state.journeys.unshift(nj); saved=nj; }
   document.getElementById('journey-modal').classList.remove('open');
   renderJourneys();
   if(!document.getElementById('view-itinerary').classList.contains('hidden') && currentItinerary===editingJourney) renderItinerary();
+  autoScratchJourney(saved);   // mark every country the trip passes through as visited
 };
+// When a journey is saved, scratch off the countries its stops fall in (don't override Lived; do upgrade Wish List).
+async function autoScratchJourney(j){
+  if(!j||!j.stops) return;
+  await ensureWfeats(); if(!wfeats) return;
+  const year = j.start ? +j.start.slice(0,4) : state.year;
+  let changed=false;
+  j.stops.forEach(s=>{ if(s.lon==null||s.lat==null) return;
+    let f=null;
+    if(s.kind==='country') f=wfeats.find(x=>x.properties.name===s.name);
+    if(!f) f=wfeats.find(x=>{ try{ return d3.geoContains(x,[s.lon,s.lat]); }catch(e){ return false; } });
+    if(!f) return; const id=String(f.id); const cur=state.marks[id];
+    if(!cur || isWish(cur)){ state.marks[id]={listId:'visited', year, notes:''}; changed=true; }
+  });
+  if(changed){ checkBadges(); saveState(); if(typeof wsel!=='undefined'&&wsel) paintWorld(); }
+}
 document.getElementById('jm-delete').onclick=()=>{
   const del=editingJourney;
   if(del){ if(state.activeRoute===del) clearRoute();
@@ -2701,8 +2739,8 @@ function openCountry(id){
   if(!mk) statusTxt="You haven't logged this one yet";
   else if(isWish(mk)) statusTxt='On your wish list';
   else { const ln=(listById(mk.listId)?listById(mk.listId).name:'Visited');
-    const ys=[...new Set(visitsOf(mk).filter(v=>!(listById(v.listId)&&listById(v.listId).wish)).map(v=>v.year).filter(Boolean))].sort();
-    statusTxt=ln+' here'+(ys.length?' in '+ys.join(', '):''); }
+    const labels=visitsOf(mk).filter(v=>!(listById(v.listId)&&listById(v.listId).wish)).map(visitLabel).filter(Boolean);
+    statusTxt=ln+' here'+(labels.length?' · '+labels.join(', '):''); }
   const sites=sitesInCountry(id);
   const rs=regionSetForCountry(id);
   let sitesHTML=`<div class="cm-sites"><b>${statusTxt}.</b>`;
