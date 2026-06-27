@@ -270,6 +270,8 @@
   .sres .sr.hi,.sres .sr:hover{background:var(--hover)}
   .sres .sr small{color:var(--muted);font-size:11px}
   .sres .none{padding:11px 14px;font-size:13px;color:var(--muted)}
+  .sres .sres-foot{padding:7px 14px;font-size:10px;color:var(--muted);opacity:.7;border-top:1px solid #00000010;text-align:right}
+  .sres .srl small{font-weight:400}
   .ctlbtn{width:42px;height:42px;flex:none;border:1px solid var(--rule);background:var(--paper);border-radius:11px;
     display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;box-shadow:0 4px 14px #0002;color:var(--ink)}
   .ctlbtn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
@@ -489,6 +491,14 @@
   .tl-ic{display:inline-flex;color:var(--accent);margin-left:3px}
   .tl-nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
   /* QR share */
+  /* danger zone + confirm dialog */
+  .danger-card{border-color:color-mix(in srgb,#e25c5c 34%,var(--rule))}
+  .danger-card h2{color:#e06666}
+  .btn.danger-btn{background:color-mix(in srgb,#e25c5c 14%,var(--field));border-color:color-mix(in srgb,#e25c5c 48%,var(--rule));color:#cf4d4d;font-weight:600}
+  .btn.danger-btn:hover{background:color-mix(in srgb,#e25c5c 24%,var(--field))}
+  #confirm-modal{position:fixed;inset:0;z-index:150;background:#1e1b16cc;display:none;align-items:center;justify-content:center;padding:24px}
+  #confirm-modal.open{display:flex;animation:fade .15s}
+  #confirm-modal .share-btns .btn{flex:1;justify-content:center;padding:11px}
   #qr-modal{position:fixed;inset:0;z-index:97;background:#1e1b1699;display:none;align-items:center;justify-content:center;padding:24px}
   #qr-modal.open{display:flex;animation:fade .15s}
   #qr-box{display:flex;justify-content:center;padding:12px;background:#fff;border-radius:12px}
@@ -814,6 +824,11 @@
           <button class="btn">Save profile</button>
           <button class="btn" id="signout-btn" style="margin-left:8px">Sign out</button>
         </div>
+        <div class="card danger-card" style="margin-top:14px">
+          <h2 style="margin:0 0 4px">Danger zone</h2>
+          <p class="lead" style="margin:0 0 12px">Reset your account back to a blank map. This erases every country, region, landmark, airport and journey you've logged. It can't be undone.</p>
+          <button class="btn danger-btn" id="reset-account-btn">Reset my account</button>
+        </div>
       </div>
     </section>
   </main>
@@ -867,7 +882,7 @@
     <div class="field" style="margin-bottom:6px"><label>Add stops</label>
       <div class="searchbox" style="position:relative">
         <span class="si" data-icon="search" data-isz="15"></span>
-        <input id="jm-search" placeholder="Search a country, city, park, UNESCO site or sea…" autocomplete="off" style="padding-left:33px"/>
+        <input id="jm-search" placeholder="Search anywhere: a city, landmark, park, region or address…" autocomplete="off" style="padding-left:33px"/>
         <div id="jm-res" class="sres"></div>
       </div>
     </div>
@@ -886,6 +901,18 @@
     <p class="lead" style="margin:0 0 14px">A friend can scan this to see a read-only snapshot of your stamps & stats.</p>
     <div id="qr-box"></div>
     <button class="btn" id="qr-copy" style="margin-top:14px;width:100%;justify-content:center">Copy link</button>
+  </div>
+</div>
+
+<!-- ---------- confirm dialog ---------- -->
+<div id="confirm-modal">
+  <div class="detail-card" style="max-width:360px;text-align:center">
+    <h3 id="confirm-title" style="margin:0 0 8px">Are you sure?</h3>
+    <p class="lead" id="confirm-msg" style="margin:0 0 18px"></p>
+    <div class="share-btns">
+      <button class="btn" id="confirm-cancel">Cancel</button>
+      <button class="btn danger-btn" id="confirm-ok">Confirm</button>
+    </div>
   </div>
 </div>
 
@@ -1312,7 +1339,7 @@ const ICONS={
   hold:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3.2 2"/>',
 };
 const ICON=(n,s=18)=>`<svg class="ic-svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:none">${ICONS[n]||''}</svg>`;
-const STOP_KINDS={country:ICON('flag',16),region:ICON('pin',16),unesco:ICON('unesco',16),park:ICON('park',16),city:ICON('city',16),water:ICON('water',16)};
+const STOP_KINDS={country:ICON('flag',16),region:ICON('pin',16),unesco:ICON('unesco',16),park:ICON('park',16),city:ICON('city',16),water:ICON('water',16),place:ICON('pin',16)};
 const AV_COLORS=['#c43e1a','#0e7c6f','#7a5ea8','#d99421','#3a7d44','#2f6f9f','#a3672f','#b5532a'];
 // build a flat searchable index (countries added once wfeats loads)
 function stopIndex(){
@@ -2408,21 +2435,48 @@ function renderDraftStops(){
   box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>{ draftStops.splice(+el.dataset.i,1); renderDraftStops(); });
 }
 const jmSearch=document.getElementById('jm-search'), jmRes=document.getElementById('jm-res');
-let jmHits=[];
-function runJmSearch(){
-  const q=jmSearch.value.trim().toLowerCase();
-  if(!q){ jmRes.classList.remove('open'); return; }
-  const order={country:0,city:1,unesco:2,park:3,water:4};
-  jmHits=stopIndex().filter(p=>p.name.toLowerCase().includes(q))
-    .sort((a,b)=>{ const an=a.name.toLowerCase().startsWith(q),bn=b.name.toLowerCase().startsWith(q);
-      if(an!==bn) return an?-1:1; if(a.kind!==b.kind) return order[a.kind]-order[b.kind]; return a.name.localeCompare(b.name); }).slice(0,8);
-  jmRes.innerHTML = jmHits.length ? jmHits.map((p,i)=>`<div class="sr" data-i="${i}"><span class="srl">${STOP_KINDS[p.kind]} ${p.name}</span><small>${p.kind}</small></div>`).join('') : '<div class="none">Nothing found</div>';
+let jmHits=[], jmGeoTimer=null, jmGeoSeq=0, jmLoading=false;
+function renderJmHits(){
+  if(!jmHits.length){ jmRes.innerHTML = jmLoading ? '<div class="none">Searching…</div>' : '<div class="none">Nothing found</div>'; jmRes.classList.add('open'); return; }
+  jmRes.innerHTML = jmHits.map((p,i)=>`<div class="sr" data-i="${i}"><span class="srl">${STOP_KINDS[p.kind]||ICON('pin',16)} ${p.name}${p.sub?` <span style="color:var(--muted);font-weight:400">· ${p.sub}</span>`:''}</span><small>${p.kindLabel||p.kind}</small></div>`).join('')
+    + (jmLoading?'<div class="none" style="opacity:.7">Searching more…</div>':'')
+    + '<div class="sres-foot">Place search via OpenStreetMap</div>';
   jmRes.classList.add('open');
   jmRes.querySelectorAll('.sr').forEach(el=>el.onclick=()=>addStop(jmHits[+el.dataset.i]));
 }
+function runJmSearch(){
+  const q=jmSearch.value.trim(), ql=q.toLowerCase();
+  if(!ql){ jmRes.classList.remove('open'); jmHits=[]; jmLoading=false; clearTimeout(jmGeoTimer); return; }
+  const order={country:0,city:1,unesco:2,park:3,water:4,place:5};
+  jmHits=stopIndex().filter(p=>p.name.toLowerCase().includes(ql))
+    .sort((a,b)=>{ const an=a.name.toLowerCase().startsWith(ql),bn=b.name.toLowerCase().startsWith(ql);
+      if(an!==bn) return an?-1:1; if(a.kind!==b.kind) return (order[a.kind]||9)-(order[b.kind]||9); return a.name.localeCompare(b.name); }).slice(0,6);
+  jmLoading = ql.length>=3;
+  renderJmHits();
+  // Geocode anything else (any city, region, landmark or address) via Photon (free, OpenStreetMap), debounced.
+  clearTimeout(jmGeoTimer);
+  if(ql.length<3) return;
+  const seq=++jmGeoSeq;
+  jmGeoTimer=setTimeout(()=>{
+    fetch('https://photon.komoot.io/api/?limit=6&q='+encodeURIComponent(q)).then(r=>r.ok?r.json():null).then(d=>{
+      if(seq!==jmGeoSeq) return; jmLoading=false;
+      if(d&&Array.isArray(d.features)){
+        const seen=new Set(jmHits.map(h=>h.name.toLowerCase()));
+        d.features.forEach(f=>{ const pr=f.properties||{}, c=(f.geometry||{}).coordinates;
+          if(!c||c.length<2||!pr.name) return; const key=pr.name.toLowerCase()+'@'+c[0].toFixed(2); if(seen.has(key)) return; seen.add(key);
+          const isCity = pr.osm_key==='place' && /^(city|town|village|hamlet|municipality|borough|suburb|locality)$/.test(pr.osm_value||'');
+          const sub=[pr.city&&pr.city!==pr.name?pr.city:null, pr.state, pr.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(', ');
+          jmHits.push({ name:pr.name, lon:c[0], lat:c[1], kind:isCity?'city':'place', sub, kindLabel:(pr.osm_value||'place').replace(/_/g,' ') });
+        });
+        jmHits=jmHits.slice(0,12);
+      }
+      renderJmHits();
+    }).catch(()=>{ if(seq===jmGeoSeq){ jmLoading=false; renderJmHits(); } });
+  },320);
+}
 function addStop(p){
-  draftStops.push({name:p.name, lon:p.lon, lat:p.lat, kind:p.kind});
-  jmSearch.value=''; jmRes.classList.remove('open'); jmHits=[]; renderDraftStops(); jmSearch.focus();
+  draftStops.push({name:p.name, lon:p.lon, lat:p.lat, kind:p.kind||'place'});
+  jmSearch.value=''; jmRes.classList.remove('open'); jmHits=[]; jmLoading=false; renderDraftStops(); jmSearch.focus();
 }
 jmSearch.oninput=runJmSearch;
 document.getElementById('jm-x').onclick=()=>document.getElementById('journey-modal').classList.remove('open');
@@ -2900,6 +2954,33 @@ updatePaintFab();
 document.getElementById('share-passport-btn').onclick=openQR;
 document.getElementById('share-card-btn').onclick=openCard;
 document.getElementById('livemap-btn').onclick=openLiveMap;
+// ---------------- confirm dialog + reset account ----------------
+function confirmDialog(title,msg,okLabel,onOk){
+  const m=document.getElementById('confirm-modal');
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  const ok=document.getElementById('confirm-ok'); ok.textContent=okLabel||'Confirm';
+  const close=()=>{ m.classList.remove('open'); ok.onclick=null; };
+  document.getElementById('confirm-cancel').onclick=close;
+  m.onclick=e=>{ if(e.target.id==='confirm-modal') close(); };
+  ok.onclick=()=>{ close(); try{ onOk(); }catch(e){} };
+  m.classList.add('open');
+}
+function resetAccount(){
+  state.marks={}; state.regionMarks={}; state.places={}; state.airports={}; state.extraUnesco=[]; state.journeys=[];
+  state.lists=JSON.parse(JSON.stringify(DEFAULT_LISTS));
+  try{ const cs=getComputedStyle(document.documentElement), lv=cs.getPropertyValue('--c-lived').trim(), vs=cs.getPropertyValue('--c-visited').trim();
+    const L=listById('lived'), V=listById('visited'); if(L&&lv)L.color=lv; if(V&&vs)V.color=vs; }catch(e){}
+  seenBadges=new Set();
+  state.activeRoute=null; state.allRoutes=false;
+  saveState();                        // persists locally and syncs the now-empty map to the cloud
+  if(typeof wsel!=='undefined' && wsel) paintWorld();
+  go('world');
+}
+document.getElementById('reset-account-btn').onclick=()=>confirmDialog(
+  'Reset your account?',
+  "This permanently erases every country, region, landmark, airport and journey you've logged, on every device. It cannot be undone.",
+  'Yes, erase everything', resetAccount);
 const startView=(location.hash||'').replace('#','');
 if(['regions','lists','account','timeline'].includes(startView)) go(startView); else ensureWorld();
 maybeShowShared();
@@ -2907,7 +2988,7 @@ maybeShowShared();
 // Restore an existing login (sessions persist across reloads + devices) and react to sign-in events.
 (function(){
   const showForm=()=>{ const a=document.getElementById('auth'); if(a) a.classList.remove('checking'); };
-  if(!sb){ showForm(); authMsg('Working offline — sign in to sync once you reconnect.'); return; }
+  if(!sb){ showForm(); authMsg('Working offline. Sign in to sync once you reconnect.'); return; }
   // Surface any error Google/Supabase handed back in the redirect URL so we're never silently stuck.
   try{ const blob=(location.hash||'')+'&'+(location.search||'');
     const em=/[#&?]error_description=([^&]+)/.exec(blob)||/[#&?]error=([^&]+)/.exec(blob);
