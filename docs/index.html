@@ -2521,10 +2521,14 @@ async function autoScratchJourney(j){
   await ensureWfeats(); if(!wfeats) return;
   const year = j.start ? +j.start.slice(0,4) : state.year;
   let changed=false;
+  const inCountry=(lon,lat)=>wfeats.find(x=>{ try{ return d3.geoContains(x,[lon,lat]); }catch(e){ return false; } });
   j.stops.forEach(s=>{ if(s.lon==null||s.lat==null) return;
     let f=null;
     if(s.kind==='country') f=wfeats.find(x=>x.properties.name===s.name);
-    if(!f) f=wfeats.find(x=>{ try{ return d3.geoContains(x,[s.lon,s.lat]); }catch(e){ return false; } });
+    if(!f) f=inCountry(s.lon,s.lat);
+    // coastal stops can sit just outside a simplified border, so nudge inland a touch and retry
+    if(!f){ const o=[[.15,0],[-.15,0],[0,.15],[0,-.15],[.15,.15],[-.15,.15],[.15,-.15],[-.15,-.15],[.3,0],[-.3,0],[0,.3],[0,-.3]];
+      for(let k=0;k<o.length&&!f;k++) f=inCountry(s.lon+o[k][0], s.lat+o[k][1]); }
     if(!f) return; const id=String(f.id); const cur=state.marks[id];
     if(!cur || isWish(cur)){ state.marks[id]={listId:'visited', year, notes:''}; changed=true; }
   });
