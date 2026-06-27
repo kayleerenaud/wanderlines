@@ -314,6 +314,19 @@
   .jchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:var(--hover);border:1px solid var(--rule);border-radius:20px;padding:4px 10px}
   .jchip .seq{background:var(--accent);color:var(--on-accent);width:16px;height:16px;border-radius:50%;font-size:10px;display:inline-flex;align-items:center;justify-content:center;flex:none}
   .jchip .rm{cursor:pointer;color:var(--accent);font-weight:700;margin-left:1px}
+  /* draggable, reorderable stop list in the journey builder */
+  .jstops{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .jstop{display:flex;align-items:center;gap:9px;font-size:13px;background:var(--field);border:1px solid var(--rule);border-radius:11px;padding:8px 10px}
+  .jstop.dragging{opacity:.6;border-color:var(--accent);background:var(--hover)}
+  .jstop .jdrag{cursor:grab;color:var(--muted);font-size:16px;line-height:1;flex:none;touch-action:none;padding:0 2px}
+  .jstop.dragging .jdrag{cursor:grabbing}
+  .jstop .seq{background:var(--accent);color:var(--on-accent);width:18px;height:18px;border-radius:50%;font-size:10px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+  .jstop .jname{flex:1;display:flex;align-items:center;gap:7px;min-width:0}
+  .jstop .jname span.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jstop .rm{cursor:pointer;color:var(--muted);font-weight:700;flex:none;padding:2px 4px}
+  .jstop .rm:hover{color:var(--accent)}
+  .jdraft-note{font-size:11px;color:var(--muted);margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .jdraft-note a{color:var(--accent);cursor:pointer;font-weight:600}
   #journey-modal{position:fixed;inset:0;z-index:96;background:#1e1b1699;display:none;align-items:flex-end;justify-content:center}
   #journey-modal.open{display:flex;animation:fade .15s ease}
   #journey-modal .detail-card{max-height:92vh;overflow-y:auto}
@@ -892,7 +905,8 @@
         <div id="jm-res" class="sres"></div>
       </div>
     </div>
-    <div class="jchips" id="jm-stops"></div>
+    <div class="jstops" id="jm-stops"></div>
+    <div class="jdraft-note" id="jm-draft-note"></div>
     <div class="detail-actions">
       <button class="btn danger" id="jm-delete" style="display:none">Delete</button>
       <button class="btn primary" id="jm-save">Save journey</button>
@@ -1225,6 +1239,8 @@ function drawOneRoute(j,color){
     .attr('transform',s=>{const p=wproj([s.lon,s.lat]);return `translate(${p[0]},${p[1]})`;})
     .style('cursor','pointer')
     .on('pointerdown',e=>e.stopPropagation())
+    .on('pointermove',(e,s)=>{ if(HOVER){ e.stopPropagation(); showTip(tip,'view-world',e,s.name,null); } })
+    .on('pointerleave',()=>{ if(HOVER) tip.style.opacity=0; })
     .on('pointerup',(e,s)=>{ e.stopPropagation(); flashTip(tip,'view-world',e,s.name,null); });
   g.append('circle').attr('class','route-pin').attr('r',9/wk).attr('stroke-width',1.6/wk).style('fill',color);
   g.append('text').attr('class','route-num').attr('text-anchor','middle').attr('dy',3.2/wk)
@@ -1240,6 +1256,8 @@ function drawOverlayRoute(j,color){
     .attr('cx',s=>wproj([s.lon,s.lat])[0]).attr('cy',s=>wproj([s.lon,s.lat])[1]).attr('r',2.6/wk)
     .attr('stroke-width',1/wk).style('fill',color)
     .style('cursor','pointer').on('pointerdown',e=>e.stopPropagation())
+    .on('pointermove',(e,s)=>{ if(HOVER){ e.stopPropagation(); showTip(tip,'view-world',e,s.name,null); } })
+    .on('pointerleave',()=>{ if(HOVER) tip.style.opacity=0; })
     .on('pointerup',(e,s)=>{ e.stopPropagation(); flashTip(tip,'view-world',e,s.name,null); });
 }
 function renderRoute(){
@@ -2440,25 +2458,57 @@ async function shareJournalEntry(j,e){
 
 // ---- journey builder modal (manual entry) ----
 let editingJourney=null, draftStops=[];
+const JDRAFT='wl_jdraft';   // an in-progress NEW journey, auto-saved so work is never lost
+function jmFields(){ return {name:document.getElementById('jm-name').value, start:document.getElementById('jm-start').value, end:document.getElementById('jm-end').value}; }
+function persistDraft(){ if(editingJourney){ updateDraftNote(); return; }
+  try{ const f=jmFields(); if(draftStops.length || (f.name||'').trim() || f.start || f.end) localStorage.setItem(JDRAFT, JSON.stringify({...f, stops:draftStops}));
+    else localStorage.removeItem(JDRAFT); }catch(e){}
+  updateDraftNote(); }
+function clearDraft(){ try{ localStorage.removeItem(JDRAFT); }catch(e){} }
+function updateDraftNote(){ const el=document.getElementById('jm-draft-note'); if(!el) return;
+  if(editingJourney || !(draftStops.length || (jmFields().name||'').trim())){ el.innerHTML=''; return; }
+  el.innerHTML='<span>✓ Draft saved automatically</span><a id="jm-startover">Start over</a>';
+  const so=document.getElementById('jm-startover'); if(so) so.onclick=()=>{ draftStops=[];
+    document.getElementById('jm-name').value=''; document.getElementById('jm-start').value=''; document.getElementById('jm-end').value='';
+    clearDraft(); renderDraftStops(); updateDraftNote(); };
+}
 function openJourneyModal(j){
   editingJourney=j||null;
-  draftStops = j ? j.stops.map(s=>({...s})) : [];
+  let d=null; if(!j){ try{ d=JSON.parse(localStorage.getItem(JDRAFT)||'null'); }catch(e){} }
+  draftStops = j ? j.stops.map(s=>({...s})) : ((d&&Array.isArray(d.stops))?d.stops.map(s=>({...s})):[]);
   document.getElementById('jm-title').textContent = j?'Edit journey':'New journey';
-  document.getElementById('jm-name').value = j?j.name:'';
-  document.getElementById('jm-start').value = j?(j.start||''):'';
-  document.getElementById('jm-end').value = j?(j.end||''):'';
+  document.getElementById('jm-name').value  = j?(j.name||'')  : (d?(d.name||''):'');
+  document.getElementById('jm-start').value = j?(j.start||'') : (d?(d.start||''):'');
+  document.getElementById('jm-end').value   = j?(j.end||'')   : (d?(d.end||''):'');
   document.getElementById('jm-delete').style.display = j?'':'none';
   document.getElementById('jm-search').value=''; document.getElementById('jm-res').classList.remove('open');
-  renderDraftStops();
+  renderDraftStops(); updateDraftNote();
   document.getElementById('journey-modal').classList.add('open');
 }
 function renderDraftStops(){
   const box=document.getElementById('jm-stops');
-  box.innerHTML = draftStops.length ? draftStops.map((s,i)=>
-    `<span class="jchip"><span class="seq">${i+1}</span>${STOP_KINDS[s.kind]||ICON('pin',16)} ${s.name}<span class="rm" data-i="${i}">✕</span></span>`).join('')
-    : '<div class="lead" style="margin:0;font-size:12px">No stops yet. Search a country, city, park, UNESCO site or sea to add it.</div>';
-  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>{ draftStops.splice(+el.dataset.i,1); renderDraftStops(); });
+  if(!draftStops.length){ box.innerHTML='<div class="lead" style="margin:0;font-size:12px">No stops yet. Search above for cities, landmarks, parks, regions or addresses.</div>'; return; }
+  box.innerHTML = draftStops.map((s,i)=>
+    `<div class="jstop" data-i="${i}"><span class="jdrag" title="Drag to reorder">⠿</span><span class="seq">${i+1}</span>`+
+    `<span class="jname">${STOP_KINDS[s.kind]||ICON('pin',16)}<span class="nm">${s.name}</span></span>`+
+    `<span class="rm" data-i="${i}" title="Remove">✕</span></div>`).join('');
+  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>{ draftStops.splice(+el.dataset.i,1); renderDraftStops(); persistDraft(); });
+  makeSortable(box);
 }
+// pointer-based drag reorder (works on desktop + touch); rebuilds the order from the DOM on drop
+function makeSortable(box){
+  box.querySelectorAll('.jstop').forEach(row=>{ const h=row.querySelector('.jdrag');
+    h.onpointerdown=e=>{ e.preventDefault(); row.classList.add('dragging'); const pid=e.pointerId; try{h.setPointerCapture(pid);}catch(_){}
+      const move=mv=>{ const others=[...box.querySelectorAll('.jstop')].filter(r=>r!==row);
+        const after=others.find(r=>{ const b=r.getBoundingClientRect(); return mv.clientY < b.top + b.height/2; });
+        if(after) box.insertBefore(row, after); else box.appendChild(row); };
+      const up=()=>{ try{h.releasePointerCapture(pid);}catch(_){} row.classList.remove('dragging'); h.onpointermove=null; h.onpointerup=null;
+        const order=[...box.querySelectorAll('.jstop')].map(r=>+r.dataset.i); draftStops=order.map(i=>draftStops[i]);
+        renderDraftStops(); persistDraft(); };
+      h.onpointermove=move; h.onpointerup=up; };
+  });
+}
+['jm-name','jm-start','jm-end'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input',persistDraft); });
 const jmSearch=document.getElementById('jm-search'), jmRes=document.getElementById('jm-res');
 let jmHits=[], jmGeoTimer=null, jmGeoSeq=0, jmLoading=false;
 function renderJmHits(){
@@ -2501,7 +2551,7 @@ function runJmSearch(){
 }
 function addStop(p){
   draftStops.push({name:p.name, lon:p.lon, lat:p.lat, kind:p.kind||'place'});
-  jmSearch.value=''; jmRes.classList.remove('open'); jmHits=[]; jmLoading=false; renderDraftStops(); jmSearch.focus();
+  jmSearch.value=''; jmRes.classList.remove('open'); jmHits=[]; jmLoading=false; renderDraftStops(); persistDraft(); jmSearch.focus();
 }
 jmSearch.oninput=runJmSearch;
 document.getElementById('jm-x').onclick=()=>document.getElementById('journey-modal').classList.remove('open');
@@ -2514,6 +2564,7 @@ document.getElementById('jm-save').onclick=()=>{
   let saved;
   if(editingJourney){ Object.assign(editingJourney,{name,start,end,stops:draftStops.slice()}); saved=editingJourney; }
   else { const nj={id:'j'+Math.round(performance.now()), name, start, end, mode:'car', lang:'', travelers:[], stops:draftStops.slice()}; state.journeys.unshift(nj); saved=nj; }
+  clearDraft();   // committed, so the auto-saved draft is no longer needed
   document.getElementById('journey-modal').classList.remove('open');
   renderJourneys();
   if(!document.getElementById('view-itinerary').classList.contains('hidden') && currentItinerary===editingJourney) renderItinerary();
