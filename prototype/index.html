@@ -2711,11 +2711,14 @@ async function autoScratchJourney(j){
   if(changed){ checkBadges(); saveState(); if(typeof wsel!=='undefined'&&wsel) paintWorld(); }
 }
 document.getElementById('jm-delete').onclick=()=>{
-  const del=editingJourney;
-  if(del){ if(state.activeRoute===del) clearRoute();
-    state.journeys=state.journeys.filter(j=>j!==del); }
-  document.getElementById('journey-modal').classList.remove('open');
-  if(currentItinerary===del){ currentItinerary=null; go('journeys'); } else renderJourneys();
+  const del=editingJourney; if(!del) return;
+  confirmDialog('Delete this journey?', '“'+(del.name||'This journey')+'” and everything in it (route, journal, photos) will be removed for good. This can’t be undone.', 'Delete journey', ()=>{
+    if(state.activeRoute===del) clearRoute();
+    state.journeys=state.journeys.filter(j=>j!==del);
+    saveState();
+    document.getElementById('journey-modal').classList.remove('open');
+    if(currentItinerary===del){ currentItinerary=null; go('journeys'); } else renderJourneys();
+  });
 };
 
 // ---- theme / vibe picker (token-driven; scaffolding untouched) ----
