@@ -424,6 +424,16 @@
   .je-share:hover{color:var(--accent)}
   .je-body{font-family:var(--font-hand);font-size:20px;line-height:1.42;white-space:pre-wrap}
   .je-new textarea{width:100%;border:1px solid var(--rule);background:var(--field);border-radius:8px;padding:9px 11px;font:inherit;font-size:13px;min-height:60px;resize:vertical;color:var(--ink)}
+  /* inline journal-entry editor (edits where the entry sits) */
+  .je-editing{border:1px solid var(--accent);border-radius:11px;padding:11px;margin-bottom:12px;background:color-mix(in srgb,var(--field) 55%,transparent)}
+  .je-editing .jei-date{width:100%;border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:8px;padding:0 11px;height:40px;font:inherit;font-size:13px;margin-bottom:8px}
+  .je-editing .jei-text{width:100%;border:1px solid var(--rule);background:var(--field);color:var(--ink);border-radius:8px;padding:9px 11px;font:inherit;font-size:13px;min-height:64px;resize:vertical}
+  .je-editing .jei-date:focus,.je-editing .jei-text:focus{outline:none;border-color:var(--accent)}
+  .je-editing .jei-thumb{margin:9px 0}
+  .je-editing .jei-thumb img{max-width:120px;border-radius:6px;display:block}
+  .je-editing .jei-prow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .je-editing .jei-rmphoto{font-size:12px;padding:6px 10px;color:var(--muted);width:auto}
+  .je-editing .share-btns .btn{flex:1;justify-content:center}
   /* normalise native date inputs so they match every other field box */
   input[type=date]{-webkit-appearance:none;appearance:none;height:42px;line-height:1.2;color:var(--ink);background:var(--field)}
   input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
@@ -2362,7 +2372,8 @@ function trailDays(j){ if(!j.start||!j.end) return 0; const a=new Date(j.start+'
   return Math.max(1, Math.round((b-a)/86400000)+1); }
 function stars(n,interactive){ let h=''; for(let s=1;s<=5;s++) h+=`<span class="star ${s<=n?'on':''}" ${interactive?`data-star="${s}"`:''}>★</span>`; return h; }
 function avInitial(name){ const t=(name||'').trim(); return t ? t.charAt(0).toUpperCase() : '·'; }
-function openItinerary(j){ currentItinerary=j; nav.classList.remove('open'); go('itinerary'); }
+function openItinerary(j){ currentItinerary=j; jEditEntry=null; nav.classList.remove('open'); go('itinerary'); }
+let jEditEntry=null, jEditPhoto=null;   // a journal entry being edited in place
 function renderItinerary(){
   const j=currentItinerary; if(!j) return;
   j.travelers=j.travelers||[]; j.modes=j.modes||[]; j.review=j.review||{}; j.journal=j.journal||[];
@@ -2379,7 +2390,15 @@ function renderItinerary(){
       <div class="sh"><span class="seq">${i+1}</span>${STOP_KINDS[s.kind]||ICON('pin',16)} ${s.name}</div></div>`).join('')
       || '<div class="lead" style="margin:0;font-size:13px">No stops yet. Tap “Edit journey” to add some.</div>';
   const esc=v=>(v||'').replace(/"/g,'&quot;');
-  const journalRows=j.journal.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map((e,i)=>`<div class="je" data-i="${i}">
+  const journalRows=j.journal.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map((e,i)=> jEditEntry===e
+    ? `<div class="je je-editing" data-i="${i}">
+        <input type="date" class="jei-date" value="${e.date||''}"/>
+        <textarea class="jei-text" placeholder="What happened…">${(e.text||'').replace(/</g,'&lt;')}</textarea>
+        <div class="jei-thumb" style="${jEditPhoto?'':'display:none'}"><img class="jei-img" src="${jEditPhoto||''}" alt=""/></div>
+        <div class="jei-prow"><label class="je-photo-pick"><input type="file" accept="image/*" class="jei-photo" hidden/><span class="jei-plabel">${jEditPhoto?'Change photo':'+ Add a photo'}</span></label>
+          <button class="btn jei-rmphoto" style="${jEditPhoto?'':'display:none'}">Remove photo</button></div>
+        <div class="share-btns" style="margin-top:10px"><button class="btn jei-cancel">Cancel</button><button class="btn primary jei-save">Save</button></div></div>`
+    : `<div class="je" data-i="${i}">
       <div class="je-head"><span class="je-date">${e.date?fmtDate(e.date):'Undated'}</span>
         <span class="je-act"><span class="je-edit" data-i="${i}" title="Edit">✎</span><span class="je-share" data-i="${i}" title="Share">⤴</span><span class="je-del" data-i="${i}" title="Delete">✕</span></span></div>
       ${e.photo?`<div class="je-photo f-${defaultFrame()}" style="transform:rotate(${[-2.2,1.7,-1.2,2.4,-1.8][i%5]}deg)"><div class="ph"><img src="${e.photo}" alt="${(e.text||'').replace(/"/g,'&quot;').slice(0,80)}"/></div></div>`:''}
@@ -2447,23 +2466,33 @@ function wireItinerary(j){
   // vehicles (multi-select)
   document.querySelectorAll('#iti-veh .veh').forEach(b=>b.onclick=()=>{ const m=b.dataset.m;
     const i=j.modes.indexOf(m); if(i>=0) j.modes.splice(i,1); else j.modes.push(m); b.classList.toggle('on'); });
-  // journal - add / edit entries, each with one optional photo (library / camera / files)
-  let draftPhoto=null, editingEntry=null;
+  // journal - the bottom box adds NEW entries; existing entries are edited in place
+  let draftPhoto=null;
   const pin=document.getElementById('je-photo'), addBtn=document.getElementById('je-add');
   if(pin) pin.onchange=e=>{ const f=e.target.files[0]; if(!f) return;
     const r=new FileReader(); r.onload=()=>{ draftPhoto=r.result; document.getElementById('je-photo-txt').textContent='✓ Photo attached · change'; }; r.readAsDataURL(f); };
   addBtn.onclick=()=>{ const d=document.getElementById('je-date').value, t=document.getElementById('je-text').value.trim();
-    if(!t && !draftPhoto && !editingEntry){ return; }
-    if(editingEntry){ Object.assign(editingEntry,{date:d,text:t,photo:draftPhoto}); }
-    else { j.journal.push({date:d,text:t,photo:draftPhoto||null}); }
-    editingEntry=null; renderItinerary(); };
+    if(!t && !draftPhoto){ return; }
+    j.journal.push({date:d,text:t,photo:draftPhoto||null}); draftPhoto=null; saveState(); renderItinerary(); };
+  // tap the pencil → turn that entry into an inline editor (right where it sits)
   document.querySelectorAll('#iti-journal .je-edit').forEach(el=>el.onclick=()=>{ const e=sortedEntry(j,+el.dataset.i);
-    editingEntry=e; draftPhoto=e.photo||null;
-    document.getElementById('je-date').value=e.date||''; document.getElementById('je-text').value=e.text||'';
-    document.getElementById('je-photo-txt').textContent=e.photo?'✓ Photo attached · change':'+ Add a photo';
-    addBtn.textContent='Save changes'; document.getElementById('je-text').focus();
-    document.querySelector('.je-new').scrollIntoView({block:'center'}); });
-  document.querySelectorAll('#iti-journal .je-del').forEach(el=>el.onclick=()=>{ const e=sortedEntry(j,+el.dataset.i); j.journal.splice(j.journal.indexOf(e),1); renderItinerary(); });
+    jEditEntry=e; jEditPhoto=e.photo||null; renderItinerary();
+    const ta=document.querySelector('#iti-journal .jei-text'); if(ta){ ta.focus(); ta.scrollIntoView({block:'center'}); } });
+  // inline editor: photo change / remove (in-DOM, so it doesn't lose your text), save, cancel
+  const jbox=document.getElementById('iti-journal');
+  const ip=jbox.querySelector('.jei-photo'); if(ip) ip.onchange=e=>{ const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader(); r.onload=()=>{ jEditPhoto=r.result;
+      const th=jbox.querySelector('.jei-thumb'), im=jbox.querySelector('.jei-img'); if(im) im.src=jEditPhoto; if(th) th.style.display='';
+      const pl=jbox.querySelector('.jei-plabel'); if(pl) pl.textContent='Change photo';
+      const rm=jbox.querySelector('.jei-rmphoto'); if(rm) rm.style.display=''; }; r.readAsDataURL(f); };
+  const rmp=jbox.querySelector('.jei-rmphoto'); if(rmp) rmp.onclick=()=>{ jEditPhoto=null;
+    const th=jbox.querySelector('.jei-thumb'); if(th) th.style.display='none';
+    const pl=jbox.querySelector('.jei-plabel'); if(pl) pl.textContent='+ Add a photo'; rmp.style.display='none'; };
+  const jsv=jbox.querySelector('.jei-save'); if(jsv) jsv.onclick=()=>{ if(!jEditEntry) return;
+    jEditEntry.date=jbox.querySelector('.jei-date').value; jEditEntry.text=jbox.querySelector('.jei-text').value.trim(); jEditEntry.photo=jEditPhoto||null;
+    jEditEntry=null; saveState(); renderItinerary(); };
+  const jcn=jbox.querySelector('.jei-cancel'); if(jcn) jcn.onclick=()=>{ jEditEntry=null; renderItinerary(); };
+  document.querySelectorAll('#iti-journal .je-del').forEach(el=>el.onclick=()=>{ const e=sortedEntry(j,+el.dataset.i); j.journal.splice(j.journal.indexOf(e),1); if(jEditEntry===e) jEditEntry=null; saveState(); renderItinerary(); });
   document.querySelectorAll('#iti-journal .je-share').forEach(el=>el.onclick=()=>shareJournalEntry(j,sortedEntry(j,+el.dataset.i)));
   document.getElementById('iti-route').onclick=()=>showRoute(j);
   document.getElementById('iti-edit').onclick=()=>openJourneyModal(j);
