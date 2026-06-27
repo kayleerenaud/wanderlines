@@ -1909,15 +1909,19 @@ function loadAirports(cb){
     airportsLoading=false; cb&&cb();
   }).catch(()=>{ airportsLoading=false; });
 }
+function renderAirportList(){   // only the logged list re-renders, so the search box keeps focus/value
+  const wrap=document.getElementById('ap-logged'); if(!wrap) return;
+  const logged=Object.entries(state.airports).sort((a,b)=>a[0].localeCompare(b[0]));
+  wrap.innerHTML=logged.length? logged.map(([code,a])=>`<div class="row" style="cursor:default"><div class="nm">${code} · ${a.name}<small>${a.city||''}${a.country?', '+a.country:''}${a.year?' · '+a.year:''}</small></div><span class="aprm" data-code="${code}" title="Remove">✕</span></div>`).join('')
+    : '<div class="lead" style="margin:0;font-size:13px">None yet. Search above to add the airports you\'ve flown through.</div>';
+  wrap.querySelectorAll('.aprm').forEach(el=>el.onclick=()=>{ delete state.airports[el.dataset.code]; saveState(); renderAirportList(); });
+}
 function renderAirports(){
   const box=document.getElementById('airports-card'); if(!box) return;
-  const logged=Object.entries(state.airports).sort((a,b)=>a[0].localeCompare(b[0]));
   box.innerHTML=`<div class="searchbox" style="position:relative;margin-bottom:10px">
       <span class="si" id="ap-si"></span>
       <input id="ap-search" placeholder="Search an airport (name or code)…" autocomplete="off"/>
-      <div id="ap-res" class="sres"></div></div>`+
-    (logged.length? logged.map(([code,a])=>`<div class="row" style="cursor:default"><div class="nm">${code} · ${a.name}<small>${a.city||''}${a.country?', '+a.country:''}${a.year?' · '+a.year:''}</small></div><span class="aprm" data-code="${code}" title="Remove">✕</span></div>`).join('')
-      : '<div class="lead" style="margin:0;font-size:13px">None yet. Search above to add the airports you\'ve flown through.</div>');
+      <div id="ap-res" class="sres"></div></div><div id="ap-logged"></div>`;
   box.querySelector('#ap-si').innerHTML=ICON('search',15);
   const inp=box.querySelector('#ap-search'), res=box.querySelector('#ap-res');
   function apSearch(){ const q=inp.value.trim().toLowerCase();
@@ -1928,11 +1932,12 @@ function renderAirports(){
     res.innerHTML=hits.length?hits.map((a,i)=>`<div class="sr" data-i="${i}"><span class="srl"><b>${a.iata}</b> · ${a.name}<small>${a.city||''}${a.country?', '+a.country:''}</small></span></div>`).join(''):'<div class="none">No airport found</div>';
     res.classList.add('open');
     res.querySelectorAll('.sr').forEach((el,i)=>el.onclick=()=>{ const a=hits[i];
-      state.airports[a.iata]={name:a.name,city:a.city,country:a.country,lat:a.lat,lon:a.lon,year:state.year}; saveState(); renderAirports(); });
+      state.airports[a.iata]={name:a.name,city:a.city,country:a.country,lat:a.lat,lon:a.lon,year:state.year}; saveState();
+      renderAirportList(); inp.value=''; res.classList.remove('open'); inp.focus(); });   // keep adding without re-clicking
   }
   inp.onfocus=()=>loadAirports(()=>{ if(inp.value.trim()) apSearch(); });
   inp.oninput=apSearch;
-  box.querySelectorAll('.aprm').forEach(el=>el.onclick=()=>{ delete state.airports[el.dataset.code]; saveState(); renderAirports(); });
+  renderAirportList();
 }
 // ---------------- timeline ----------------
 function renderTimeline(){
@@ -3298,8 +3303,17 @@ function saveStateLocal(){ lastSaveTs=new Date().toISOString();
     if(!shrankPhotos){ shrinkExistingPhotos(); }
     try{ localStorage.setItem('wl_data',blob); }catch(_){}
   } }
-// saveState persists locally AND (when signed in) schedules a debounced sync to the cloud
-function saveState(){ saveStateLocal(); if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
+// saveState persists locally AND (when signed in) schedules a debounced sync to the cloud.
+// The local write is a full JSON.stringify of everything, so doing it on EVERY rapid change (e.g.
+// logging many airports or marking many countries in a row) stacks up and lags. We coalesce rapid
+// writes: save promptly when idle, otherwise batch a write every ~400ms. pagehide/visibility flush.
+let _saveTimer=null, _lastLocalSave=0;
+function flushSaveLocal(){ if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; } _lastLocalSave=Date.now(); saveStateLocal(); }
+function saveState(){ if(typeof scheduleCloudPush==='function') scheduleCloudPush();   // cloud push is already debounced
+  if(_saveTimer) return;                                  // a local write is already queued
+  const delay = (Date.now()-_lastLocalSave > 1000) ? 0 : 400;
+  _saveTimer=setTimeout(()=>{ _saveTimer=null; _lastLocalSave=Date.now(); saveStateLocal(); }, delay);
+}
 function loadState(){ try{ const d=JSON.parse(localStorage.getItem('wl_data')||'null'); if(!d) return;
   if(d.marks) state.marks=d.marks; if(d.regionMarks) state.regionMarks=d.regionMarks; if(d.places) state.places=d.places;
   if(d.lists) state.lists=d.lists; if(Array.isArray(d.journeys)) state.journeys=d.journeys; if(d.year) state.year=d.year;
@@ -3315,9 +3329,9 @@ backfillJourneyLandmarks();    // surface park/UNESCO journey stops in their lis
 setTimeout(shrinkExistingPhotos,1200);   // quietly shrink any oversized photos saved before compression existed
 loadCountryData();
 let savedNative=false; try{ savedNative=localStorage.getItem('wl_native')==='1'; }catch(e){} state.nativeNames=savedNative;
-setInterval(saveState,3000);
-document.addEventListener('visibilitychange',()=>{ if(document.hidden){ saveState(); pushCloud(); } });
-window.addEventListener('pagehide',()=>{ saveState(); pushCloud(); });
+setInterval(()=>{ if(_saveTimer) flushSaveLocal(); },3000);   // backstop: flush any queued write
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ flushSaveLocal(); pushCloud(); } });
+window.addEventListener('pagehide',()=>{ flushSaveLocal(); pushCloud(); });
 
 applyTheme(savedTheme,false);
 let savedUnits='mi'; try{ savedUnits=localStorage.getItem('wl_units')||'mi'; }catch(e){} applyUnits(savedUnits,false);
