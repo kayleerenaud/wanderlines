@@ -1254,12 +1254,16 @@ function drawWorld(){
   renderMarks();
   renderRoute();
   // keep zoom + pan clamped to the screen so the map can never shrink below or drift off the viewport
-  worldZoom=d3.zoom().scaleExtent([1,9]).extent([[0,0],[W,H]]).translateExtent([[0,0],[W,H]])
+  worldZoom=d3.zoom().scaleExtent([1,28]).extent([[0,0],[W,H]]).translateExtent([[0,0],[W,H]])
     .on('zoom',e=>{
       wk=e.transform.k;
       wSphere.attr('transform',e.transform); wLand.attr('transform',e.transform);
       wMarks.attr('transform',e.transform); wRoute.attr('transform',e.transform);
-      wLand.selectAll('path').attr('stroke-width',d=>(state.marks[d.id]&&isWish(state.marks[d.id])?0.9:0.18)/wk);
+      // borders stay a constant on-screen width by default; let them grow a touch as you zoom so
+      // deep-zoomed coastlines read crisply instead of fading to an invisible hairline
+      const grow=Math.min(1+(wk-1)*0.13, 3);
+      wLand.selectAll('path').attr('stroke-width',d=>(state.marks[d.id]&&isWish(state.marks[d.id])?0.9:0.18)*grow/wk);
+      wSphere.selectAll('.graticule').attr('stroke-width',0.5/wk);
       wMarks.selectAll('circle').attr('r',5/wk);
       if(state.activeRoute||state.allRoutes||state.journeyOverlay) renderRoute();
     });
@@ -1543,7 +1547,7 @@ function runSearch(){
     openRegion(REGION_SETS.find(r=>r.code===el.dataset.region)); });
   searchRes.querySelectorAll('.logchip').forEach(el=>el.onclick=ev=>{ ev.stopPropagation();
     const id=el.dataset.id; searchRes.classList.remove('open'); searchIn.blur();
-    const f=wfeats&&wfeats.find(x=>String(x.id)===id); if(f) zoomToCountry(f); else if(C_LL[id]) zoomToPoint(C_LL[id][1],C_LL[id][0],4);
+    const f=wfeats&&wfeats.find(x=>String(x.id)===id); if(f) zoomToCountry(f); else if(C_LL[id]) zoomToPoint(C_LL[id][1],C_LL[id][0],6);
     openCountryById(id); });
 }
 function pickSearch(i){
@@ -1553,12 +1557,12 @@ function pickSearch(i){
   searchRes.classList.remove('open'); searchIn.value=h.name; searchIn.blur();
   const r=document.getElementById('view-world').getBoundingClientRect();
   const flashAt=(label,mark)=>setTimeout(()=>flashTip(tip,'view-world',{clientX:r.left+r.width/2,clientY:r.top+r.height*0.42},label,mark),780);
-  if(h.type==='country'){ if(h.f) zoomToCountry(h.f); else if(C_LL[h.id]) zoomToPoint(C_LL[h.id][1],C_LL[h.id][0],4); flashAt(h.name, state.marks[h.id]); }
+  if(h.type==='country'){ if(h.f) zoomToCountry(h.f); else if(C_LL[h.id]) zoomToPoint(C_LL[h.id][1],C_LL[h.id][0],6); flashAt(h.name, state.marks[h.id]); }
   else { // a searched UNESCO site beyond the 64 → pin it so you can tap to log it
     if(h.type==='unesco' && !LANDMARKS.unesco.some(([n])=>n===h.name)){
       LANDMARKS.unesco.push([h.name,h.lon,h.lat]); state.extraUnesco.push([h.name,h.lon,h.lat]); saveState(); }
     state.layers[h.layer]=true; renderMarks();
-    zoomToPoint(h.lon,h.lat,5); flashAt((h.type==='parks'?ICON('park',15):ICON('unesco',15))+' '+h.name,null); }
+    zoomToPoint(h.lon,h.lat,9); flashAt((h.type==='parks'?ICON('park',15):ICON('unesco',15))+' '+h.name,null); }
 }
 function zoomToPoint(lon,lat,k){ if(!worldZoom) return;
   const el=document.getElementById('world-svg'),W=el.clientWidth,H=el.clientHeight,p=wproj([lon,lat]);
@@ -1568,7 +1572,7 @@ function zoomToCountry(feat){
   const el=document.getElementById('world-svg'),W=el.clientWidth,H=el.clientHeight;
   const [[x0,y0],[x1,y1]]=wpath.bounds(feat);
   const dx=x1-x0,dy=y1-y0,cx=(x0+x1)/2,cy=(y0+y1)/2;
-  const k=Math.max(1,Math.min(8,0.5/Math.max(dx/W,dy/H)));
+  const k=Math.max(1,Math.min(16,0.5/Math.max(dx/W,dy/H)));
   const t=d3.zoomIdentity.translate(W/2-k*cx,H/2-k*cy).scale(k);
   wsvg.transition().duration(750).call(worldZoom.transform,t);
 }
