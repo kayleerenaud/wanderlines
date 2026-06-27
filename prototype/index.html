@@ -114,6 +114,8 @@
   .sphere{fill:var(--ocean)}
   .graticule{fill:none;stroke:var(--grid,#b79a6a);stroke-width:.5;opacity:.7}
   .country,.region{stroke:var(--land-stroke);stroke-width:.18;fill:var(--land);cursor:pointer;pointer-events:all}
+  .region.region-flash{stroke:var(--accent)!important;animation:regflash .55s ease-in-out 3}
+  @keyframes regflash{0%,100%{stroke-width:1.2}50%{stroke-width:3.4}}
   /* wish list = a lighter version of the unmarked land color for each vibe (e.g. retro gray -> light gray) */
   .country.wish,.region.wish{fill:color-mix(in srgb,var(--land) 34%,var(--paper));stroke:color-mix(in srgb,var(--land) 55%,var(--paper));stroke-width:.4;stroke-dasharray:none}
 
@@ -1450,6 +1452,12 @@ function setLayer(layer,on){ state.layers[layer]=on; renderMarks(); }
 // ---------------- country search ----------------
 const searchIn=document.getElementById('search-in'), searchRes=document.getElementById('search-res');
 let searchHits=[];
+// index of every sub-region name (states/provinces/etc.) -> its country's region map, for search
+let REGION_INDEX=null, regionIndexLoading=false;
+function loadRegionIndex(){ if(REGION_INDEX||regionIndexLoading) return; regionIndexLoading=true;
+  fetch('https://cdn.jsdelivr.net/gh/reeeneeee/wanderlines@master/docs/data/region-index.json').then(r=>r.ok?r.json():null)
+    .then(d=>{ regionIndexLoading=false; if(Array.isArray(d)){ REGION_INDEX=d; if(searchIn.value.trim()) runSearch(); } })
+    .catch(()=>{ regionIndexLoading=false; }); }
 // the full ~1,000-site UNESCO list, lazy-loaded for search only (the map keeps the 64 pins)
 let UNESCO_FULL=null, unescoLoading=false;
 function loadUnescoFull(){
@@ -1472,12 +1480,19 @@ function runSearch(){
   LANDMARKS.parks.forEach(([name,lon,lat])=>{ if(name.toLowerCase().includes(q)) lms.push({type:'parks',name:name+' NP',lon,lat,layer:'parks'}); });
   LANDMARKS.unesco.forEach(([name,lon,lat])=>{ if(name.toLowerCase().includes(q)){ useen.add(name.toLowerCase()); lms.push({type:'unesco',name,lon,lat,layer:'unesco'}); } });
   if(UNESCO_FULL) UNESCO_FULL.forEach(s=>{ if(s.name.toLowerCase().includes(q)&&!useen.has(s.name.toLowerCase())) lms.push({type:'unesco',name:s.name,lon:s.lon,lat:s.lat,layer:'unesco'}); });
-  searchHits=[...countries,...lms].sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8);
+  // sub-regions (states, provinces, prefectures, departments…) → open that country's regional page
+  const regions=[]; if(REGION_INDEX){ const rseen=new Set();
+    REGION_INDEX.forEach(ri=>{ if(ri.n.toLowerCase().includes(q)){ const k=ri.n.toLowerCase()+'@'+ri.c; if(rseen.has(k))return; rseen.add(k);
+      const set=REGION_SETS.find(r=>r.code===ri.c); if(set) regions.push({type:'subregion',name:ri.n,code:ri.c,country:set.name}); } }); }
+  const byName=(a,b)=>{ const an=a.name.toLowerCase().startsWith(q),bn=b.name.toLowerCase().startsWith(q); if(an!==bn)return an?-1:1; return a.name.localeCompare(b.name); };
+  countries.sort(byName); regions.sort(byName); lms.sort(byName);
+  searchHits=[...countries.slice(0,6), ...regions.slice(0,6), ...lms.slice(0,6)].slice(0,12);
   if(!searchHits.length){ searchRes.innerHTML='<div class="none">Nothing found</div>'; searchRes.classList.add('open'); return; }
   searchRes.innerHTML=searchHits.map((h,i)=>{
     if(h.type==='country'){ const m=state.marks[h.id], l=m&&listById(m.listId), rs=regionSetForCountry(h.id), fu=flagURL(h.id);
       const status=m?(isWish(m)?'Wish List':(l?l.name:''))+(m.year&&!isWish(m)?' · '+m.year:''):'country';
       return `<div class="sr" data-i="${i}"><span class="srl">${fu?`<img src="${fu}" alt="" style="width:19px;height:13px;object-fit:cover;border-radius:2px;margin-right:3px;vertical-align:-1px">`:ICON('flag',14)} ${displayName(h.id)}<small>${status}</small></span><span class="rchip logchip" data-id="${h.id}">${m?'Edit ›':'Log ›'}</span>`+(rs?`<span class="rchip" data-region="${rs.code}">Regions ›</span>`:'')+`</div>`; }
+    if(h.type==='subregion'){ return `<div class="sr" data-i="${i}"><span class="srl">${ICON('pin',14)} ${h.name}<small>${h.country} · region</small></span><span class="rchip">Open ›</span></div>`; }
     return `<div class="sr" data-i="${i}"><span class="srl">${ICON(h.type==='parks'?'park':'unesco',14)} ${h.name}<small>${h.type==='parks'?'National Park':'UNESCO site'}</small></span></div>`;
   }).join('');
   searchRes.classList.add('open');
@@ -1492,6 +1507,8 @@ function runSearch(){
 }
 function pickSearch(i){
   const h=searchHits[i]; if(!h) return;
+  if(h.type==='subregion'){ searchRes.classList.remove('open'); searchIn.value=''; searchHits=[]; searchIn.blur();
+    const set=REGION_SETS.find(r=>r.code===h.code); if(set) openRegion(set, h.name); return; }
   searchRes.classList.remove('open'); searchIn.value=h.name; searchIn.blur();
   const r=document.getElementById('view-world').getBoundingClientRect();
   const flashAt=(label,mark)=>setTimeout(()=>flashTip(tip,'view-world',{clientX:r.left+r.width/2,clientY:r.top+r.height*0.42},label,mark),780);
@@ -1516,7 +1533,7 @@ function zoomToCountry(feat){
 }
 searchIn.oninput=runSearch;
 searchIn.onkeydown=e=>{ if(e.key==='Enter'&&searchHits.length) pickSearch(0); };
-searchIn.onfocus=()=>{ loadUnescoFull(); if(searchIn.value.trim()) runSearch(); };
+searchIn.onfocus=()=>{ loadUnescoFull(); loadRegionIndex(); if(searchIn.value.trim()) runSearch(); };
 
 // ---------------- region search (states / provinces) ----------------
 const searchIn2=document.getElementById('search-in2'), searchRes2=document.getElementById('search-res2');
@@ -1614,7 +1631,7 @@ function renderRegions(){
 const rsvg=d3.select('#region-svg'), rLand=rsvg.append('g');
 const tip2=document.getElementById('tip2');
 let curRegion=null, rfeats=null, rsel=null, rpath=null, regionZoom=null, rk=1;
-function openRegion(r){
+function openRegion(r, focusName){
   curRegion=r;
   document.getElementById('region-title').textContent=r.name;
   document.getElementById('region-sub').textContent='Scratch-off · '+r.sub;
@@ -1627,7 +1644,16 @@ function openRegion(r){
     if(r.kind==='topo'){ rfeats=topojson.feature(data,data.objects[r.obj]).features; r.keyFn=d=>d.id; }
     else { rfeats=data.features; r.keyFn=d=>d.properties.name; }
     drawRegion();
+    if(focusName) flashRegionFeature(focusName);
   });
+}
+// briefly highlight a named sub-region (e.g. when you reach this page from search)
+function flashRegionFeature(name){
+  const nm=(name||'').toLowerCase().trim(); let tries=0;
+  (function go(){ if(rsel && rsel.size()){
+      rLand.selectAll('path').filter(d=>(((d.properties&&d.properties.name)||'')+'').toLowerCase()===nm).classed('region-flash',true).raise();
+      setTimeout(()=>rLand.selectAll('path').classed('region-flash',false),2200);
+    } else if(++tries<25) setTimeout(go,140); })();
 }
 function drawRegion(){
   const el=document.getElementById('region-svg'); const W=el.clientWidth,H=el.clientHeight;
