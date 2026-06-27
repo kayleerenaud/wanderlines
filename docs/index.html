@@ -2795,8 +2795,15 @@ $('auth-submit').onclick=async()=>{
   btn.disabled=false; btn.textContent=label;
 };
 $('google-btn').onclick=async()=>{
-  if(sb && GOOGLE_READY){ try{ await sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin+location.pathname } }); }catch(e){ authMsg('Google sign-in failed. Try email & password.','err'); } }
-  else { authMsg('Google sign-in is being set up. For now, use email & password just below.'); }
+  if(!sb){ authMsg('Can’t reach the sign-in service. Reload and try again.','err'); return; }
+  authMsg('Opening Google…');
+  try{
+    const {error}=await sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin+location.pathname } });
+    if(error){ authMsg(/provider|not enabled|unsupported/i.test(error.message)
+      ? 'Google sign-in isn’t switched on yet. Use email & password for now.'
+      : error.message, 'err'); }
+    // on success the browser redirects to Google, then back here signed in
+  }catch(e){ authMsg('Google sign-in failed. Use email & password for now.','err'); }
 };
 const signout=$('signout-btn'); if(signout) signout.onclick=async()=>{
   try{ if(sb) await sb.auth.signOut(); }catch(e){}
