@@ -1531,9 +1531,13 @@ function landmarkIndex(layer){
   return out;
 }
 function landmarkSearch(layer,q){ const nq=normSearch(q); if(!nq) return [];
-  const hits=landmarkIndex(layer).filter(p=> normSearch(p.name).includes(nq) || (p.country&&normSearch(p.country).includes(nq)) || (p.state&&normSearch(p.state).includes(nq)) );
-  hits.sort((a,b)=>{ const an=normSearch(a.name).startsWith(nq),bn=normSearch(b.name).startsWith(nq); if(an!==bn)return an?-1:1; return a.name.localeCompare(b.name); });
-  return hits.slice(0,10);
+  // rank exact country/state matches above incidental name-substring matches, so e.g. searching
+  // "Greece" surfaces ALL Greek sites (the dropdown scrolls) rather than a handful of name hits.
+  const hits=landmarkIndex(layer).map(p=>{ const nameHit=normSearch(p.name).includes(nq);
+      const placeHit=(p.country&&normSearch(p.country).includes(nq))||(p.state&&normSearch(p.state).includes(nq));
+      return (nameHit||placeHit)?{p,rank:(normSearch(p.name).startsWith(nq)?0:(nameHit?1:2))}:null; }).filter(Boolean);
+  hits.sort((a,b)=> a.rank-b.rank || a.p.name.localeCompare(b.p.name));
+  return hits.slice(0,100).map(h=>h.p);
 }
 // Log a landmark into its list (and keep it as a map pin), persisting custom ones. Returns true if newly added.
 function logPlace(layer,name,lon,lat,year){ name=(name||'').trim(); if(!name) return false;
