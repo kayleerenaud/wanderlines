@@ -3400,6 +3400,23 @@ function authMsg(t,kind){ const el=$('auth-msg'); if(!el) return; el.textContent
 // Hydrate the whole app from a saved cloud blob (same shape as Export/Backup), without a page reload.
 const _mergeRegion=(a,b)=>{ const out={...(a||{})}; for(const k in (b||{})) out[k]={...(a&&a[k]||{}), ...b[k]}; return out; };
 const _unionPairs=(a,b)=>{ a=Array.isArray(a)?a:[]; b=Array.isArray(b)?b:[]; const seen=new Set(a.map(e=>e[0])), out=a.slice(); b.forEach(e=>{ if(!seen.has(e[0])){ seen.add(e[0]); out.push(e); } }); return out; };
+// Merge journey arrays by id, NEVER dropping a journey: union all, and on an id clash keep the
+// richer copy (more journal entries/photos/stops). Prevents a sparse/seed cloud from wiping journeys.
+const _seedJourneyIds=()=>new Set((SEED_JOURNEYS||[]).map(j=>j&&j.id).filter(Boolean));
+function _mergeJourneys(local,cloud){ local=Array.isArray(local)?local:[]; cloud=Array.isArray(cloud)?cloud:[];
+  const score=j=>j?((j.journal||[]).filter(e=>e&&(e.text||e.photo)).length*10 + (j.journal||[]).filter(e=>e&&e.photo).length*8 + (j.stops||[]).length + (j.travelers||[]).length + (j.remember||[]).length):-1;
+  const byId=new Map(), add=j=>{ if(!j) return; const id=j.id||('nm:'+(j.name||'')+'|'+(j.start||'')); const ex=byId.get(id); if(!ex||score(j)>=score(ex)) byId.set(id,j); };
+  local.forEach(add); cloud.forEach(add);
+  let out=[...byId.values()]; const seed=_seedJourneyIds();
+  if(out.some(j=>j&&!seed.has(j.id))) out=out.filter(j=>j&&!seed.has(j.id));   // drop the example once real journeys exist
+  return out;
+}
+// Does the device hold REAL user data (anything beyond a brand-new seeded account)?
+function localHasRealData(){ const seed=_seedJourneyIds();
+  return (state.marks&&Object.keys(state.marks).length>0) || (state.places&&Object.keys(state.places).length>0)
+      || (state.airports&&Object.keys(state.airports).length>0) || (state.regionMarks&&Object.keys(state.regionMarks).length>0)
+      || (Array.isArray(state.journeys)&&state.journeys.some(j=>j&&!seed.has(j.id)));
+}
 function hydrateFromCloud(obj){
   const d=(obj&&obj.data)?obj.data:(obj||{});
   // Merge additive logs (don't replace): a site/country/airport logged on this device that hasn't
@@ -3409,7 +3426,7 @@ function hydrateFromCloud(obj){
   state.regionMarks=_mergeRegion(state.regionMarks, d.regionMarks);
   state.places={...(state.places||{}), ...(d.places||{})};
   state.airports={...(state.airports||{}), ...(d.airports||{})};
-  if(d.lists) state.lists=d.lists; state.journeys=Array.isArray(d.journeys)?d.journeys:[];
+  if(d.lists) state.lists=d.lists; state.journeys=_mergeJourneys(state.journeys, d.journeys);  // merge, never replace
   if(d.year) state.year=d.year;
   state.extraUnesco=_unionPairs(state.extraUnesco, d.extraUnesco);
   state.extraUnesco.forEach(e=>{ if(!LANDMARKS.unesco.some(([n])=>n===e[0])) LANDMARKS.unesco.push(e); });
@@ -3464,7 +3481,9 @@ async function onSignedIn(session){
   authMsg('');
   try{ history.replaceState(null,'',location.pathname); }catch(e){}   // strip the #access_token from the address bar
   let res='empty'; try{ res=await loadCloudInto(); }catch(e){}   // pull this account's map
-  if(res==='empty') freshStartState();         // brand-new account: clean map (keeps the example journey)
+  // Only seed a clean map when the cloud is empty AND this device has no real data of its own.
+  // If the device already holds journeys/countries, keep them (and push up) - never wipe local data.
+  if(res==='empty'){ if(!localHasRealData()) freshStartState(); }
   else if(res==='hydrated') migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journal
   // 'kept-local' keeps the newer local edits untouched
   backfillJourneyLandmarks();         // surface park/UNESCO journey stops in their lists
@@ -3541,6 +3560,10 @@ function saveStateLocal(){ lastSaveTs=new Date().toISOString();
   const payload={ _ts:lastSaveTs,
     marks:state.marks, regionMarks:state.regionMarks, places:state.places,
     lists:state.lists, journeys:state.journeys, year:state.year, extraUnesco:state.extraUnesco, extraParks:state.extraParks, airports:state.airports };
+  // Safety net: keep a small photo-stripped backup of journeys so they can never silently vanish.
+  try{ if(Array.isArray(state.journeys)&&state.journeys.length && localHasRealData()){
+    const jb=state.journeys.map(j=>({...j, journal:(j.journal||[]).map(e=>e&&e.photo?{...e,photo:null}:e)}));
+    localStorage.setItem('wl_jbak', JSON.stringify({ _ts:lastSaveTs, journeys:jb })); } }catch(_){}
   try{ localStorage.setItem('wl_data',JSON.stringify(payload)); return; }catch(e){}
   // out of localStorage room (almost always oversized photos). Shrink photos for next time, and meanwhile
   // GUARANTEE the small stuff (countries, sites, airports, journeys) still saves by writing a copy with
@@ -3570,6 +3593,15 @@ function loadState(){ try{ const d=JSON.parse(localStorage.getItem('wl_data')||'
     d.extraParks.forEach(e=>{ if(!LANDMARKS.parks.some(([n])=>n===e[0])) LANDMARKS.parks.push(e); }); }
 }catch(e){} }
 loadState();
+// If the loaded data came back with no real journeys but the safety backup still has some,
+// restore them (structure/text survive even if a sync ever wipes the main copy).
+try{ const bak=JSON.parse(localStorage.getItem('wl_jbak')||'null');
+  if(bak && Array.isArray(bak.journeys) && bak.journeys.length){
+    const seed=_seedJourneyIds();
+    const curReal=Array.isArray(state.journeys)&&state.journeys.some(j=>j&&!seed.has(j.id));
+    const bakReal=bak.journeys.some(j=>j&&!seed.has(j.id));
+    if(bakReal && !curReal){ state.journeys=_mergeJourneys(state.journeys, bak.journeys); }
+  } }catch(_){}
 migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journal on local load
 backfillJourneyLandmarks();    // surface park/UNESCO journey stops in their lists
 setTimeout(shrinkExistingPhotos,1200);   // quietly shrink any oversized photos saved before compression existed
