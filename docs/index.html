@@ -51,30 +51,30 @@
     --font:"Righteous",-apple-system,"Segoe UI",sans-serif;
     --font-display:"Monoton","Righteous",sans-serif; --font-hand:"Caveat",cursive;
   }
-  [data-theme="earthy"]{ /* earthy - forest palette */
-    --ocean:#dce4d1; --ocean-hi:#eef1e4; --land:#3a4a32; --land-stroke:#eef0e3;
-    --paper:#eef0e3; --ink:#26301f; --muted:#7c8a6c; --rule:#a8b58f;
+  [data-theme="earthy"]{ /* earthy - sage & forest, botanical */
+    --ocean:#d2dec2; --ocean-hi:#e6eed7; --land:#33442a; --land-stroke:#e2ead4;
+    --paper:#e9eddc; --ink:#26301f; --muted:#76856a; --rule:#a3b189;
     --field:#f7f9ef; --hover:#e9eedd; --accent:#5b7a3a; --accent2:#a3672f; --gold:#bf8f33;
-    --c-lived:#a3672f; --c-visited:#5b7a3a;
+    --c-lived:#b06a26; --c-visited:#6f9540;
     --photo-filter:sepia(.18) saturate(.92) contrast(1.02); --grain-opacity:.13; --route-dash:none; --grid:#9aab86;
     --font:"Fraunces","Georgia","Iowan Old Style",serif;
     --font-display:"Cinzel","Trajan Pro",serif; --font-hand:"Caveat",cursive;
   }
-  [data-theme="cute"]{ /* cute - soft pastels, muted pink & butter */
-    --ocean:#fdf4f9; --ocean-hi:#fffafd; --land:#ecd9e6; --land-stroke:#fffafd;
-    --paper:#fdf5fa; --ink:#5a4651; --muted:#8c7382; --rule:#f0d3e0; --on-accent:#fff;
-    --field:#fffbfe; --hover:#fbeef6; --accent:#d35b97; --accent2:#c9913a; --gold:#cf9a36;
-    --c-lived:#f1a3c4; --c-visited:#eccb84;
-    --photo-filter:saturate(1.12) brightness(1.05) contrast(.96); --grain-opacity:.08; --route-dash:2 6; --grid:#e6b8cf;
+  [data-theme="cute"]{ /* cute - bubblegum: saturated pink + a mint pop */
+    --ocean:#ffe2ef; --ocean-hi:#fff1f7; --land:#f7bcd8; --land-stroke:#fff5fb;
+    --paper:#fff0f7; --ink:#6a3c54; --muted:#b07d96; --rule:#f6c5dc; --on-accent:#fff;
+    --field:#fff7fb; --hover:#ffe6f3; --accent:#e8478f; --accent2:#37b88a; --gold:#e8a23a;
+    --c-lived:#f06bb0; --c-visited:#5fc9a3;
+    --photo-filter:saturate(1.18) brightness(1.04) contrast(.97); --grain-opacity:.08; --route-dash:2 6; --grid:#f3a9cd;
     --font:"Quicksand",-apple-system,"Segoe UI",sans-serif;
     --font-display:"Chewy","Baloo 2",cursive; --font-hand:"Patrick Hand",cursive;
   }
-  [data-theme="classic"]{ /* classic - Conté à Paris, hand-drawn sketch */
-    --ocean:#ece2cd; --ocean-hi:#f5eedd; --land:#dccdab; --land-stroke:#6b513a;
-    --paper:#f1e8d3; --ink:#3a2f25; --muted:#9a8467; --rule:#c3ad84;
-    --field:#f6efdd; --hover:#ece0c6; --accent:#a6442e; --accent2:#4a5a6a; --gold:#9a6b34;
-    --c-lived:#a6442e; --c-visited:#4a5a6a;
-    --photo-filter:sepia(.5) contrast(1.06) brightness(1.02); --grain-opacity:.2; --route-dash:8 3 2 3; --grid:#b09058;
+  [data-theme="classic"]{ /* classic - antique treasure map: aged parchment, dark ink coastlines, compass */
+    --ocean:#e5d3a8; --ocean-hi:#efe1bb; --land:#d6c597; --land-stroke:#4d3a20;
+    --paper:#ecdfbe; --ink:#3a2c1c; --muted:#937c54; --rule:#bda472;
+    --field:#f1e6c6; --hover:#e6d6ad; --accent:#a6442e; --accent2:#3f5263; --gold:#956322;
+    --c-lived:#a6442e; --c-visited:#3f5263;
+    --photo-filter:sepia(.55) contrast(1.08) brightness(1.0); --grain-opacity:.2; --route-dash:8 3 2 3; --grid:#937640;
     --font:"EB Garamond","Hoefler Text",Georgia,serif;
     --font-display:"Great Vibes","Pinyon Script",cursive; --font-hand:"Great Vibes",cursive;
   }
@@ -82,18 +82,23 @@
   /* Vibe textures are UNDERLAYS: each surface (body, cards, panels) carries the texture as its own
      background via --tex, so content/text sit cleanly on top. #vibe-tex is now only the sleek vignette. */
   #vibe-tex{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0}
+  /* sleek: showroom gloss - a soft diagonal sheen streak + top highlight + deep edge vignette */
   [data-theme="sleek"] #vibe-tex{opacity:1;background:
-    radial-gradient(120% 95% at 50% 28%, rgba(255,255,255,.045), rgba(255,255,255,0) 40%),
-    radial-gradient(150% 140% at 50% 58%, rgba(0,0,0,0) 46%, rgba(0,0,0,.96) 122%)}
+    linear-gradient(122deg, rgba(255,255,255,0) 34%, rgba(255,255,255,.05) 45%, rgba(255,255,255,0) 53%),
+    radial-gradient(120% 95% at 50% 26%, rgba(255,255,255,.05), rgba(255,255,255,0) 40%),
+    radial-gradient(150% 140% at 50% 58%, rgba(0,0,0,0) 44%, rgba(0,0,0,.97) 122%)}
+  /* classic: burnt-parchment vignette (darkens only the far edges, like an aged map) */
+  [data-theme="classic"] #vibe-tex{opacity:1;background:
+    radial-gradient(135% 125% at 50% 46%, rgba(74,48,22,0) 60%, rgba(60,38,16,.5) 122%)}
   /* earthy: gritty crumpled paper (raking-light turbulence) multiplied onto the surface color */
   [data-theme="earthy"]{--tex-blend:multiply;--tex-size:560px 560px;
     --tex:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='w'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.015' numOctaves='5' seed='11' stitchTiles='stitch' result='t'/><feDiffuseLighting in='t' surfaceScale='4' diffuseConstant='1.12' lighting-color='%23ffffff'><feDistantLight azimuth='235' elevation='44'/></feDiffuseLighting></filter><rect width='100%25' height='100%25' filter='url(%23w)'/></svg>")}
   /* classic: faint warm paper grain (kept light per feedback) */
   [data-theme="classic"]{--tex-blend:normal;--tex-size:190px 190px;
     --tex:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='190' height='190'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.55 0.42'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
-  /* cute: very soft sparse dots */
-  [data-theme="cute"]{--tex-blend:normal;--tex-size:34px 34px;
-    --tex:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><circle cx='9' cy='9' r='1.5' fill='%23e98fb8' opacity='0.22'/></svg>")}
+  /* cute: subtle bubblegum bubbles (faint rings with a tiny highlight) */
+  [data-theme="cute"]{--tex-blend:normal;--tex-size:54px 54px;
+    --tex:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='54' height='54'><g fill='none' stroke='%23ef82bb' stroke-width='1.2' opacity='0.28'><circle cx='14' cy='15' r='6.5'/><circle cx='39' cy='38' r='4'/></g><circle cx='11.5' cy='12.5' r='1.4' fill='%23ffffff' opacity='0.5'/><circle cx='37.2' cy='36.4' r='0.9' fill='%23ffffff' opacity='0.45'/></svg>")}
   /* script & bubble display fonts (classic calligraphy, cute bubble) read wrong spaced + uppercase:
      give those titles natural case and a size bump. Earthy uses Cinzel, which suits Roman caps, so it
      keeps the default uppercase treatment. */
@@ -154,6 +159,15 @@
   svg.map{display:block;width:100%;height:100%;touch-action:none}
   .sphere{fill:transparent}  /* ocean comes from the (textured) body behind the transparent map */
   .graticule{fill:none;stroke:var(--grid,#b79a6a);stroke-width:.5;opacity:.7}
+  [data-theme="classic"] .graticule{stroke-dasharray:1.4 2.4;opacity:.9}   /* treasure-map dashed grid */
+  [data-theme="sleek"] .graticule{opacity:.4}
+  [data-theme="earthy"] .graticule{opacity:.5}
+  [data-theme="cute"] .graticule{opacity:.5}
+  /* classic treasure-map compass rose: a decorative cartographic watermark over the ocean */
+  #map-compass{position:absolute;left:14px;bottom:96px;width:96px;height:96px;display:none;pointer-events:none;z-index:6;color:var(--land-stroke);opacity:.34}
+  #map-compass svg{width:100%;height:100%;display:block}
+  [data-theme="classic"] #map-compass{display:block}
+  @media (max-width:480px){ #map-compass{width:78px;height:78px;bottom:90px} }
   .country,.region{stroke:var(--land-stroke);stroke-width:.18;fill:var(--land);cursor:pointer;pointer-events:all}
   .region.region-flash{stroke:var(--accent)!important;animation:regflash .55s ease-in-out 3}
   @keyframes regflash{0%,100%{stroke-width:1.2}50%{stroke-width:3.4}}
@@ -745,6 +759,12 @@
     <!-- WORLD -->
     <section class="view" id="view-world">
       <svg class="map" id="world-svg"></svg>
+      <div id="map-compass" aria-hidden="true"><svg viewBox="0 0 120 120">
+        <g fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="60" cy="60" r="53"/><circle cx="60" cy="60" r="45" stroke-dasharray="1.5 3"/><circle cx="60" cy="60" r="3.4"/></g>
+        <g fill="currentColor" opacity=".5"><path d="M60 60 L80 40 L64 56 Z"/><path d="M60 60 L80 80 L64 64 Z"/><path d="M60 60 L40 80 L56 64 Z"/><path d="M60 60 L40 40 L56 56 Z"/></g>
+        <g fill="currentColor"><path d="M60 7 L65 60 L60 60 Z"/><path d="M113 60 L60 65 L60 60 Z"/><path d="M60 113 L55 60 L60 60 Z"/><path d="M7 60 L60 55 L60 60 Z"/></g>
+        <g fill="currentColor" opacity=".5"><path d="M60 7 L55 60 L60 60 Z"/><path d="M113 60 L60 55 L60 60 Z"/><path d="M60 113 L65 60 L60 60 Z"/><path d="M7 60 L60 65 L60 60 Z"/></g>
+      </svg></div>
       <div class="mapctl">
         <div class="searchbox">
           <span class="si" data-icon="search" data-isz="15"></span>
@@ -3034,9 +3054,9 @@ const THEME_META=[
   {id:'retro',  name:'Retro',   sw:['#f7edd6','#c43e1a','#0e7c6f','#3b2f2a']},
   {id:'sleek',  name:'Sleek',   sw:['#0d0e11','#d8b76a','#aeb6c0','#9c3a31']},
   {id:'disco',  name:'Disco',   sw:['#1d0636','#ff2bd6','#1fe3cb','#f5e63d']},
-  {id:'earthy', name:'Earthy',  sw:['#eef0e3','#5b7a3a','#a3672f','#3a4a32']},
-  {id:'cute',   name:'Cute',    sw:['#fff7fb','#ff8fc0','#ffc94d','#e8c8da']},
-  {id:'classic',name:'Classic', sw:['#efe2c0','#7a4a22','#4a5a3a','#c0a06a']},
+  {id:'earthy', name:'Earthy',  sw:['#d2dec2','#5b7a3a','#a3672f','#33442a']},
+  {id:'cute',   name:'Cute',    sw:['#ffe2ef','#f06bb0','#5fc9a3','#e8478f']},
+  {id:'classic',name:'Classic', sw:['#e5d3a8','#a6442e','#3f5263','#4d3a20']},
 ];
 function buildThemeGrid(){
   const g=document.getElementById('theme-grid'); if(!g) return;
