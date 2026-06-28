@@ -2201,34 +2201,16 @@ function exportBackup(){
 async function applyBackup(obj){
   const d=(obj&&obj.data)?obj.data:obj; // tolerate a raw state object too
   if(!d||typeof d!=='object'||(!d.marks&&!d.journeys&&!d.places)) throw new Error('not a Wanderlines backup');
-  // MERGE the backup straight into the LIVE app state - and DON'T reload. A reload would re-run the
-  // cloud sync, which could pull a stale/empty cloud copy over the freshly-imported data. By updating
-  // memory + saving + pushing to the cloud right here, the import becomes the authoritative copy.
-  state.marks={...(state.marks||{}), ...(d.marks||{})};
-  state.regionMarks=_mergeRegion(state.regionMarks, d.regionMarks);
-  state.places={...(state.places||{}), ...(d.places||{})};
-  state.airports={...(state.airports||{}), ...(d.airports||{})};
-  if(d.lists && d.lists.length && !(state.lists&&state.lists.length)) state.lists=d.lists;
-  state.journeys=_mergeJourneys(state.journeys, d.journeys);
-  if(d.year) state.year=d.year;
-  state.extraUnesco=_unionPairs(state.extraUnesco, d.extraUnesco);
-  state.extraUnesco.forEach(e=>{ if(!LANDMARKS.unesco.some(([n])=>n===e[0])) LANDMARKS.unesco.push(e); });
-  state.extraParks=_unionPairs(state.extraParks, d.extraParks);
-  state.extraParks.forEach(e=>{ if(!LANDMARKS.parks.some(([n])=>n===e[0])) LANDMARKS.parks.push(e); });
+  // RESTORE: a backup file is a full snapshot, so importing REPLACES the current state with it (no merging).
+  // We update memory, mark this device as the newest, save locally, and push the import up as the new cloud
+  // revision so every other device adopts it. No reload (a reload could race the cloud read).
+  adoptDocument(obj);
   // compress any oversized (e.g. full-res) photos so the import fits local storage and is never stripped
   for(const j of state.journeys){ for(const e of (j.journal||[])){ if(e&&typeof e.photo==='string'&&e.photo.length>180000){ try{ const small=await compressDataURL(e.photo); if(small&&small.length<e.photo.length) e.photo=small; }catch(_){} } } }
-  if(obj&&obj.prefs){ try{ if(obj.prefs.theme) applyTheme(obj.prefs.theme,true); if(obj.prefs.units) applyUnits(obj.prefs.units,true);
-    if('native' in obj.prefs){ state.nativeNames=!!obj.prefs.native; localStorage.setItem('wl_native',obj.prefs.native?'1':'0'); } }catch(e){} }
-  dropExampleIfReal();                // the imported journeys are real -> remove the Example
-  migrateStopNotesToJournal();        // fold any legacy per-stop notes into the journal
-  backfillJourneyLandmarks();         // surface park/UNESCO journey stops in their lists
-  saveState();                        // persist locally + schedule the cloud sync
-  pushCloud();                        // push immediately so the cloud reflects the import
-  // re-render whatever is on screen (no reload)
-  try{ if(typeof wsel!=='undefined' && wsel) paintWorld(); }catch(_){}
-  try{ renderJourneys(); }catch(_){}
-  try{ renderAccount(); }catch(_){}
-  try{ renderLists&&renderLists(); renderContinents&&renderContinents(); }catch(_){}
+  markDirty();                        // this import is the newest truth on this device
+  saveStateLocal();                   // persist the restored snapshot locally
+  await pushCloud(true);              // push immediately as a new revision so the cloud + other devices follow
+  refreshViews();                     // re-render whatever is on screen (no reload)
   backupMsg('Imported! '+state.journeys.length+' journeys and '+Object.keys(state.marks).length+' countries are now on your map.');
 }
 (function(){
@@ -3408,10 +3390,17 @@ const SB_URL='https://dkwhsvrgounkzwxncgmv.supabase.co';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrd2hzdnJnb3Vua3p3eG5jZ212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MTQwODgsImV4cCI6MjA5ODA5MDA4OH0.reI4vPEe5WrohcKgmSoPSV3d0z58hJrnm2vNIYNCfic';
 const sb = (window.supabase && SB_URL && SB_ANON) ? window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:'implicit' } }) : null;
 let cloudUser=null, cloudPushTimer=null, GOOGLE_READY=false;
-// True only once we've positively read this account's cloud row and confirmed it is empty (brand-new account).
-// Until that is known, pushCloud refuses to overwrite the cloud with a seed-only/example state, so a transient
-// read failure can never let a fresh device clobber real cloud data with the Example Journey.
-let cloudKnownEmpty=false;
+// ===== Cloud sync state (revision-based, whole-document, last-write-wins) =====
+// The cloud row is ONE document per account. We never field-merge (that made countries accumulate and
+// never clear); we replace the whole document. A monotonic `rev` makes the newest save win predictably.
+//  - syncedRev : the cloud revision this device has loaded or pushed (0 = never synced)
+//  - localDirty: true when this device has edits that aren't in the cloud yet
+let syncedRev=0, localDirty=false;
+try{ syncedRev=parseInt(localStorage.getItem('wl_rev')||'0',10)||0; }catch(_){}
+try{ localDirty=localStorage.getItem('wl_dirty')==='1'; }catch(_){}
+function markDirty(){ localDirty=true; try{ localStorage.setItem('wl_dirty','1'); }catch(_){} }
+function setSynced(rev){ syncedRev=(+rev)||0; localDirty=false;
+  try{ localStorage.setItem('wl_rev',String(syncedRev)); localStorage.removeItem('wl_dirty'); }catch(_){} }
 function authMsg(t,kind){ const el=$('auth-msg'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; el.style.color=(kind==='err')?'var(--accent)':'var(--muted)'; }
 
 // Hydrate the whole app from a saved cloud blob (same shape as Export/Backup), without a page reload.
@@ -3438,104 +3427,120 @@ function localHasRealData(){ const seed=_seedJourneyIds();
       || (state.airports&&Object.keys(state.airports).length>0) || (state.regionMarks&&Object.keys(state.regionMarks).length>0)
       || (Array.isArray(state.journeys)&&state.journeys.some(j=>j&&!seed.has(j.id)));
 }
-function hydrateFromCloud(obj){
-  const d=(obj&&obj.data)?obj.data:(obj||{});
-  // Merge additive logs (don't replace): a site/country/airport logged on this device that hasn't
-  // synced yet is kept rather than wiped by the cloud copy. We only reach here when the cloud is at
-  // least as new as local, so the cloud wins on conflicting keys; local-only keys are preserved.
-  state.marks={...(state.marks||{}), ...(d.marks||{})};
-  state.regionMarks=_mergeRegion(state.regionMarks, d.regionMarks);
-  state.places={...(state.places||{}), ...(d.places||{})};
-  state.airports={...(state.airports||{}), ...(d.airports||{})};
-  if(d.lists) state.lists=d.lists; state.journeys=_mergeJourneys(state.journeys, d.journeys);  // merge, never replace
+// Replace the ENTIRE in-memory state from a cloud/backup document. No field-by-field merging:
+// what the document says IS the state. This is what stops countries from accumulating forever.
+function adoptDocument(doc){
+  const d=(doc&&doc.data&&typeof doc.data==='object')?doc.data:(doc||{});
+  state.marks       = (d.marks       && typeof d.marks==='object')       ? d.marks       : {};
+  state.regionMarks = (d.regionMarks && typeof d.regionMarks==='object') ? d.regionMarks : {};
+  state.places      = (d.places      && typeof d.places==='object')      ? d.places      : {};
+  state.airports    = (d.airports    && typeof d.airports==='object')    ? d.airports    : {};
+  state.lists       = (Array.isArray(d.lists) && d.lists.length)         ? d.lists       : JSON.parse(JSON.stringify(DEFAULT_LISTS));
+  state.journeys    = Array.isArray(d.journeys)                          ? d.journeys    : [];
   if(d.year) state.year=d.year;
-  state.extraUnesco=_unionPairs(state.extraUnesco, d.extraUnesco);
+  state.extraUnesco = Array.isArray(d.extraUnesco) ? d.extraUnesco : [];
+  state.extraParks  = Array.isArray(d.extraParks)  ? d.extraParks  : [];
   state.extraUnesco.forEach(e=>{ if(!LANDMARKS.unesco.some(([n])=>n===e[0])) LANDMARKS.unesco.push(e); });
-  state.extraParks=_unionPairs(state.extraParks, d.extraParks);
   state.extraParks.forEach(e=>{ if(!LANDMARKS.parks.some(([n])=>n===e[0])) LANDMARKS.parks.push(e); });
-  if(obj&&obj.prefs){ if(obj.prefs.theme) applyTheme(obj.prefs.theme,true); if(obj.prefs.units) applyUnits(obj.prefs.units,true);
-    state.nativeNames=!!obj.prefs.native; try{ localStorage.setItem('wl_native',obj.prefs.native?'1':'0'); }catch(e){} }
-  saveStateLocal();
-  shrankPhotos=false;   // freshly-loaded cloud data may carry full-res photos: let the shrink pass run
-  // absorb earned badges silently so loading your map doesn't set off a parade
+  const prefs=(doc&&doc.prefs)||(d&&d.prefs);
+  if(prefs){ if(prefs.theme) applyTheme(prefs.theme,true); if(prefs.units) applyUnits(prefs.units,true);
+    state.nativeNames=!!prefs.native; try{ localStorage.setItem('wl_native',prefs.native?'1':'0'); }catch(_){} }
+  migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journal
+  dropExampleIfReal();           // never show the Example alongside real journeys
+  backfillJourneyLandmarks();    // surface park/UNESCO journey stops in their lists
+  shrankPhotos=false;            // freshly-loaded data may carry full-res photos: let the shrink pass run
   seenBadges=new Set(); BADGES.forEach(b=>{ try{ if(b.test()) seenBadges.add(b.id); }catch(_){} });
   if(typeof wsel!=='undefined' && wsel) paintWorld();
 }
-// A brand-new account starts with a clean map (no demo countries), but keeps the one example journey.
+function refreshViews(){ try{
+  const vis=v=>{ const el=document.getElementById('view-'+v); return el && !el.classList.contains('hidden'); };
+  if(vis('account')) renderAccount();
+  if(vis('journeys')) renderJourneys();
+  if(typeof renderLists==='function') renderLists();
+  if(typeof renderContinents==='function') renderContinents();
+  if(typeof wsel!=='undefined' && wsel) paintWorld();
+}catch(_){} }
+// A brand-new account starts with a clean map (no demo countries) plus the single Example Journey.
 function freshStartState(){
   if(localHasRealData()) return;   // SAFETY: never wipe a device that already holds real data
   state.marks={}; state.regionMarks={}; state.places={}; state.airports={}; state.extraUnesco=[]; state.extraParks=[];
   state.journeys = JSON.parse(JSON.stringify(SEED_JOURNEYS));
   state.lists = JSON.parse(JSON.stringify(DEFAULT_LISTS));
-  // re-apply the current vibe's scratch colors onto the freshly-reset lists
   try{ const cs=getComputedStyle(document.documentElement), lv=cs.getPropertyValue('--c-lived').trim(), vs=cs.getPropertyValue('--c-visited').trim();
     const L=listById('lived'), V=listById('visited'); if(L&&lv)L.color=lv; if(V&&vs)V.color=vs; }catch(e){}
   saveStateLocal();
   seenBadges=new Set(); BADGES.forEach(b=>{ try{ if(b.test()) seenBadges.add(b.id); }catch(_){} });
   if(typeof wsel!=='undefined' && wsel) paintWorld();
 }
-// Returns 'hydrated' (cloud loaded), 'kept-local' (local was newer, do not overwrite), or 'empty'.
-async function loadCloudInto(){
-  if(!sb||!cloudUser) return 'empty';
-  try{ const {data,error}=await sb.from('user_data').select('data,updated_at').eq('user_id',cloudUser.id).maybeSingle();
-    // A real read error is NOT the same as an empty cloud. If we treated it as empty we might seed the Example
-    // and then push it over the user's real cloud data. Return 'error' so callers keep local data untouched.
-    if(error) return 'error';
-    if(!data||!data.data||!Object.keys(data.data).length){ cloudKnownEmpty=true; return 'empty'; }
-    // If unsynced local edits are newer than what's in the cloud, keep them (and push up) instead
-    // of clobbering them with a stale cloud copy. This is the "reload made my entries disappear" bug.
-    let localTs=0, localHasData=false;
-    try{ const d=JSON.parse(localStorage.getItem('wl_data')||'null');
-      if(d){ localTs=Date.parse(d._ts)||0; localHasData=!!(d.journeys&&d.journeys.length)||!!(d.marks&&Object.keys(d.marks).length); } }catch(_){}
-    const cloudTs=Date.parse(data.updated_at)||0;
-    if(localHasData && localTs && localTs > cloudTs+2000){ cloudKnownEmpty=false; return 'kept-local'; }
-    cloudKnownEmpty=false; hydrateFromCloud(data.data); return 'hydrated';
+// Write the whole document to the cloud as the next revision. `force` lets a brand-new account
+// save its seed; otherwise we never create a seed-only row before we've seen the cloud.
+async function pushCloud(force){
+  if(!sb||!cloudUser) return;
+  if(!force && !localHasRealData() && syncedRev===0) return;
+  const nextRev=(syncedRev||0)+1;
+  const doc=fullBackup(); doc.rev=nextRev; const ts=new Date().toISOString(); doc._ts=ts;
+  try{ const {error}=await sb.from('user_data').upsert({ user_id:cloudUser.id, data:doc, updated_at:ts },{ onConflict:'user_id' });
+    if(!error) setSynced(nextRev);
   }catch(e){}
-  return 'error';   // anything thrown -> treat as a failed read, never as "cloud is empty"
 }
-function scheduleCloudPush(){ if(!sb||!cloudUser) return; clearTimeout(cloudPushTimer); cloudPushTimer=setTimeout(pushCloud,2500); }
-async function pushCloud(){ if(!sb||!cloudUser) return;
-  // HARD SAFETY: never overwrite the cloud with a seed-only / no-real-data state unless we positively
-  // confirmed this account's cloud row is empty (a genuine brand-new account). This makes it impossible
-  // for a fresh device whose cloud read failed to clobber real cloud journeys with the Example Journey.
-  if(!localHasRealData() && !cloudKnownEmpty) return;
-  try{ await sb.from('user_data').upsert({ user_id:cloudUser.id, data:fullBackup(), updated_at:new Date().toISOString() },{ onConflict:'user_id' }); }catch(e){}
+function scheduleCloudPush(){ if(!sb||!cloudUser) return; clearTimeout(cloudPushTimer); cloudPushTimer=setTimeout(()=>pushCloud(),2500); }
+// Read this account's cloud document and reconcile with local. Whole-document, never field-merged.
+// Returns: 'hydrated' (cloud is the truth -> replaced local), 'pushed-local' (local is the truth -> wrote it up),
+//          'empty' (no cloud row and no local data -> caller seeds), 'error' (read failed -> do nothing).
+async function loadCloudInto(){
+  if(!sb||!cloudUser) return 'error';
+  let row=null;
+  try{ const {data,error}=await sb.from('user_data').select('data,updated_at').eq('user_id',cloudUser.id).maybeSingle();
+    if(error) return 'error';              // a read error is NEVER treated as "cloud is empty"
+    row=data;
+  }catch(e){ return 'error'; }
+  const cloudDoc=row&&row.data;
+  const cloudHasData=!!(cloudDoc&&typeof cloudDoc==='object'&&(cloudDoc.data||cloudDoc.journeys||cloudDoc.marks));
+  const cloudRev=(cloudDoc&&+cloudDoc.rev)||0;
+  if(!cloudHasData){
+    // No usable cloud row. If THIS device holds real data, make it the account's truth; otherwise new account.
+    if(localHasRealData()){ await pushCloud(true); return 'pushed-local'; }
+    return 'empty';
+  }
+  if(!localDirty){
+    // No unsynced local edits. The cloud is normally authoritative -> replace local wholesale.
+    // FIRST-SYNC SAFETY: if this device has never synced (syncedRev 0) and the cloud is a legacy/unversioned
+    // doc (rev 0) while this device holds real data, prefer LOCAL so a corrupted/empty cloud can't replace it.
+    if(syncedRev===0 && cloudRev===0 && localHasRealData()){ await pushCloud(true); return 'pushed-local'; }
+    adoptDocument(cloudDoc); setSynced(cloudRev); saveStateLocal(); return 'hydrated';
+  }
+  // We have local edits. Decide by revision, then by timestamp.
+  if(cloudRev>syncedRev){
+    const cloudTs=Date.parse(row.updated_at)||0; let localTs=0;
+    try{ localTs=Date.parse((JSON.parse(localStorage.getItem('wl_data')||'{}')||{})._ts)||0; }catch(_){}
+    if(cloudTs>=localTs){ adoptDocument(cloudDoc); setSynced(cloudRev); saveStateLocal(); return 'hydrated'; }
+  }
+  // Local builds on (or is newer than) the cloud -> push local up as the next revision.
+  syncedRev=Math.max(syncedRev,cloudRev);
+  await pushCloud(true);
+  return 'pushed-local';
 }
 async function onSignedIn(session){
   if(!session||!session.user) return;
   cloudUser=session.user; state.user=session.user.email||'';
   const ae=$('acct-email'); if(ae) ae.value=state.user;
-  $('auth').classList.add('hidden');  // unlock the app immediately so a slow cloud read never traps you on the login screen
-  $('auth').classList.remove('checking');
-  authMsg('');
-  try{ history.replaceState(null,'',location.pathname); }catch(e){}   // strip the #access_token from the address bar
-  let res='error'; try{ res=await loadCloudInto(); }catch(e){ res='error'; }   // pull this account's map
-  // Only seed a clean map when the cloud is GENUINELY empty AND this device has no real data of its own.
-  // If the device already holds journeys/countries, keep them (and push up) - never wipe local data.
-  if(res==='empty'){ if(!localHasRealData()) freshStartState(); }
-  else if(res==='hydrated') migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journal
-  // 'kept-local' keeps the newer local edits untouched
-  if(res==='error'){
-    // Couldn't read the cloud (transient network/backend hiccup). Do NOT seed and do NOT push - that could
-    // overwrite real cloud data with the Example. Keep whatever is on this device and retry the read shortly.
-    authMsg('');
-    let tries=0; const retry=()=>{ if(cloudUser&&tries<6){ tries++; loadCloudInto().then(r=>{
-      if(r==='hydrated'){ try{migrateStopNotesToJournal();backfillJourneyLandmarks();}catch(_){}
-        try{ if(document.getElementById('view-account')&&!document.getElementById('view-account').classList.contains('hidden')) renderAccount();
-             if(document.getElementById('view-journeys')&&!document.getElementById('view-journeys').classList.contains('hidden')) renderJourneys();
-             if(typeof wsel!=='undefined'&&wsel) paintWorld(); }catch(_){}
-      } else if(r==='error'){ setTimeout(retry,2500); } }).catch(()=>setTimeout(retry,2500)); } };
+  $('auth').classList.add('hidden');           // unlock immediately so a slow read never traps you on login
+  $('auth').classList.remove('checking'); authMsg('');
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}   // strip the #access_token from the URL
+  let res='error'; try{ res=await loadCloudInto(); }catch(e){ res='error'; }
+  if(res==='empty'){ freshStartState(); await pushCloud(true); }       // brand-new account: seed + save the seed
+  else if(res==='error'){
+    // Failed read: keep local exactly as-is, never seed or push, and retry until the read succeeds.
+    let tries=0; const retry=()=>{ if(!cloudUser||tries>=8) return; tries++;
+      loadCloudInto().then(r=>{ if(r==='error') setTimeout(retry,2500); else refreshViews(); }).catch(()=>setTimeout(retry,2500)); };
     setTimeout(retry,2000);
   }
-  backfillJourneyLandmarks();         // surface park/UNESCO journey stops in their lists
-  shrinkExistingPhotos();             // shrink any full-res photos saved before compression existed
-  if(res!=='error') pushCloud();      // make sure the cloud has the latest (esp. for kept-local); never push on a failed read
-  const vis=v=>document.getElementById('view-'+v)&&!document.getElementById('view-'+v).classList.contains('hidden');
-  if(vis('account')) renderAccount();
-  if(vis('journeys')) renderJourneys();
-  if(typeof wsel!=='undefined' && wsel) paintWorld();
-  let seen=false; try{ seen=localStorage.getItem('wl_seen_help')==='1'; }catch(e){}
-  if(!seen){ try{ localStorage.setItem('wl_seen_help','1'); }catch(e){} setTimeout(()=>$('help').classList.add('open'),550); }
+  shrinkExistingPhotos();
+  refreshViews();
+  // Show the welcome/help key only for a genuinely new account, not for a returning user on a fresh browser.
+  if(res==='empty'){ let seen=false; try{ seen=localStorage.getItem('wl_seen_help')==='1'; }catch(e){}
+    if(!seen){ try{ localStorage.setItem('wl_seen_help','1'); }catch(e){} setTimeout(()=>$('help').classList.add('open'),550); } }
+  else { try{ localStorage.setItem('wl_seen_help','1'); }catch(e){} }
 }
 // Local-only fallback used when the backend can't load (offline / CDN blocked).
 function enterApp(email){ state.user=email||'traveler@wanderlines.app'; const ae=$('acct-email'); if(ae) ae.value=state.user; $('auth').classList.add('hidden');
@@ -3574,8 +3579,9 @@ $('google-btn').onclick=async()=>{
 };
 const signout=$('signout-btn'); if(signout) signout.onclick=async()=>{
   try{ if(sb) await sb.auth.signOut(); }catch(e){}
-  cloudUser=null; state.user=null;
-  try{ localStorage.removeItem('wl_data'); }catch(e){}   // clear local cache so the next person starts clean
+  cloudUser=null; state.user=null; syncedRev=0; localDirty=false;
+  // clear local cache + sync bookkeeping so the next person starts clean and never inherits this account's revision
+  try{ localStorage.removeItem('wl_data'); localStorage.removeItem('wl_rev'); localStorage.removeItem('wl_dirty'); localStorage.removeItem('wl_jbak'); }catch(e){}
   location.reload();
 };
 
@@ -3622,7 +3628,8 @@ function saveStateLocal(){ lastSaveTs=new Date().toISOString();
 // writes: save promptly when idle, otherwise batch a write every ~400ms. pagehide/visibility flush.
 let _saveTimer=null, _lastLocalSave=0;
 function flushSaveLocal(){ if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; } _lastLocalSave=Date.now(); saveStateLocal(); }
-function saveState(){ if(typeof scheduleCloudPush==='function') scheduleCloudPush();   // cloud push is already debounced
+function saveState(){ if(typeof markDirty==='function') markDirty();   // this device now has edits not yet in the cloud
+  if(typeof scheduleCloudPush==='function') scheduleCloudPush();   // cloud push is already debounced
   if(_saveTimer) return;                                  // a local write is already queued
   const delay = (Date.now()-_lastLocalSave > 1000) ? 0 : 400;
   _saveTimer=setTimeout(()=>{ _saveTimer=null; _lastLocalSave=Date.now(); saveStateLocal(); }, delay);
