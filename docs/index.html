@@ -3417,6 +3417,10 @@ const SB_URL='https://dkwhsvrgounkzwxncgmv.supabase.co';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrd2hzdnJnb3Vua3p3eG5jZ212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MTQwODgsImV4cCI6MjA5ODA5MDA4OH0.reI4vPEe5WrohcKgmSoPSV3d0z58hJrnm2vNIYNCfic';
 const sb = (window.supabase && SB_URL && SB_ANON) ? window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:'implicit' } }) : null;
 let cloudUser=null, cloudPushTimer=null, GOOGLE_READY=false;
+// True only once we've positively read this account's cloud row and confirmed it is empty (brand-new account).
+// Until that is known, pushCloud refuses to overwrite the cloud with a seed-only/example state, so a transient
+// read failure can never let a fresh device clobber real cloud data with the Example Journey.
+let cloudKnownEmpty=false;
 function authMsg(t,kind){ const el=$('auth-msg'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; el.style.color=(kind==='err')?'var(--accent)':'var(--muted)'; }
 
 // Hydrate the whole app from a saved cloud blob (same shape as Export/Backup), without a page reload.
@@ -3483,20 +3487,27 @@ function freshStartState(){
 async function loadCloudInto(){
   if(!sb||!cloudUser) return 'empty';
   try{ const {data,error}=await sb.from('user_data').select('data,updated_at').eq('user_id',cloudUser.id).maybeSingle();
-    if(error||!data||!data.data||!Object.keys(data.data).length) return 'empty';
+    // A real read error is NOT the same as an empty cloud. If we treated it as empty we might seed the Example
+    // and then push it over the user's real cloud data. Return 'error' so callers keep local data untouched.
+    if(error) return 'error';
+    if(!data||!data.data||!Object.keys(data.data).length){ cloudKnownEmpty=true; return 'empty'; }
     // If unsynced local edits are newer than what's in the cloud, keep them (and push up) instead
     // of clobbering them with a stale cloud copy. This is the "reload made my entries disappear" bug.
     let localTs=0, localHasData=false;
     try{ const d=JSON.parse(localStorage.getItem('wl_data')||'null');
       if(d){ localTs=Date.parse(d._ts)||0; localHasData=!!(d.journeys&&d.journeys.length)||!!(d.marks&&Object.keys(d.marks).length); } }catch(_){}
     const cloudTs=Date.parse(data.updated_at)||0;
-    if(localHasData && localTs && localTs > cloudTs+2000) return 'kept-local';
-    hydrateFromCloud(data.data); return 'hydrated';
+    if(localHasData && localTs && localTs > cloudTs+2000){ cloudKnownEmpty=false; return 'kept-local'; }
+    cloudKnownEmpty=false; hydrateFromCloud(data.data); return 'hydrated';
   }catch(e){}
-  return 'empty';
+  return 'error';   // anything thrown -> treat as a failed read, never as "cloud is empty"
 }
 function scheduleCloudPush(){ if(!sb||!cloudUser) return; clearTimeout(cloudPushTimer); cloudPushTimer=setTimeout(pushCloud,2500); }
 async function pushCloud(){ if(!sb||!cloudUser) return;
+  // HARD SAFETY: never overwrite the cloud with a seed-only / no-real-data state unless we positively
+  // confirmed this account's cloud row is empty (a genuine brand-new account). This makes it impossible
+  // for a fresh device whose cloud read failed to clobber real cloud journeys with the Example Journey.
+  if(!localHasRealData() && !cloudKnownEmpty) return;
   try{ await sb.from('user_data').upsert({ user_id:cloudUser.id, data:fullBackup(), updated_at:new Date().toISOString() },{ onConflict:'user_id' }); }catch(e){}
 }
 async function onSignedIn(session){
@@ -3507,15 +3518,27 @@ async function onSignedIn(session){
   $('auth').classList.remove('checking');
   authMsg('');
   try{ history.replaceState(null,'',location.pathname); }catch(e){}   // strip the #access_token from the address bar
-  let res='empty'; try{ res=await loadCloudInto(); }catch(e){}   // pull this account's map
-  // Only seed a clean map when the cloud is empty AND this device has no real data of its own.
+  let res='error'; try{ res=await loadCloudInto(); }catch(e){ res='error'; }   // pull this account's map
+  // Only seed a clean map when the cloud is GENUINELY empty AND this device has no real data of its own.
   // If the device already holds journeys/countries, keep them (and push up) - never wipe local data.
   if(res==='empty'){ if(!localHasRealData()) freshStartState(); }
   else if(res==='hydrated') migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journal
   // 'kept-local' keeps the newer local edits untouched
+  if(res==='error'){
+    // Couldn't read the cloud (transient network/backend hiccup). Do NOT seed and do NOT push - that could
+    // overwrite real cloud data with the Example. Keep whatever is on this device and retry the read shortly.
+    authMsg('');
+    let tries=0; const retry=()=>{ if(cloudUser&&tries<6){ tries++; loadCloudInto().then(r=>{
+      if(r==='hydrated'){ try{migrateStopNotesToJournal();backfillJourneyLandmarks();}catch(_){}
+        try{ if(document.getElementById('view-account')&&!document.getElementById('view-account').classList.contains('hidden')) renderAccount();
+             if(document.getElementById('view-journeys')&&!document.getElementById('view-journeys').classList.contains('hidden')) renderJourneys();
+             if(typeof wsel!=='undefined'&&wsel) paintWorld(); }catch(_){}
+      } else if(r==='error'){ setTimeout(retry,2500); } }).catch(()=>setTimeout(retry,2500)); } };
+    setTimeout(retry,2000);
+  }
   backfillJourneyLandmarks();         // surface park/UNESCO journey stops in their lists
   shrinkExistingPhotos();             // shrink any full-res photos saved before compression existed
-  pushCloud();                        // make sure the cloud has the latest (esp. for kept-local)
+  if(res!=='error') pushCloud();      // make sure the cloud has the latest (esp. for kept-local); never push on a failed read
   const vis=v=>document.getElementById('view-'+v)&&!document.getElementById('view-'+v).classList.contains('hidden');
   if(vis('account')) renderAccount();
   if(vis('journeys')) renderJourneys();
@@ -3580,7 +3603,7 @@ Object.keys(VIBE_DISPLAY).forEach(vibe=>{
   }catch(_){}
 });
 // app version (build.mjs injects the real number) so you can confirm you're on the latest build
-const APP_VER='v59';
+const APP_VER='v60';
 try{ const vl=document.getElementById('app-ver-line'); if(vl) vl.textContent='Wanderlines '+(APP_VER.indexOf('APP_VER')>=0?'(dev)':APP_VER); }catch(_){}
 // paint our own line-icons into every static [data-icon] slot (no emoji)
 document.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML=ICON(el.dataset.icon, +(el.dataset.isz)||18); });
