@@ -2828,7 +2828,40 @@ function makeSortable(box){
 }
 ['jm-name','jm-start','jm-end'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input',persistDraft); });
 const jmSearch=document.getElementById('jm-search'), jmRes=document.getElementById('jm-res');
-let jmHits=[], jmGeoTimer=null, jmGeoSeq=0, jmLoading=false;
+let jmHits=[], jmGeoTimer=null, jmGeoSeq=0, jmLoading=false, jmNq='';
+// Order journey-stop results by geographic scale: country -> region -> city -> landmark -> water -> place,
+// within the same relevance. And translate raw OpenStreetMap tags ("administrative", "secondary"…) into
+// plain labels people understand.
+const JM_RANK={country:0, region:1, city:2, park:3, unesco:3, water:4, place:5};
+const JM_LABEL={country:'Country', region:'Region', city:'City', park:'National Park', unesco:'UNESCO site', water:'Sea / Lake', place:'Place'};
+function classifyPlace(pr){ const k=pr.osm_key||'', v=pr.osm_value||'', t=pr.type||'';
+  if(t==='country'||v==='country') return {kind:'country', label:'Country'};
+  if(t==='state') return {kind:'region', label:'State / Region'};
+  if(t==='county') return {kind:'region', label:'County'};
+  if((k==='boundary'&&v==='administrative')||t==='region'||t==='district') return {kind:'region', label:'Region'};
+  if(k==='place'){ if(v==='city') return {kind:'city', label:'City'};
+    if(/^(town|village|hamlet|municipality|borough|suburb|locality|neighbourhood|quarter)$/.test(v)) return {kind:'city', label:'Town'};
+    if(/^(island|islet|archipelago)$/.test(v)) return {kind:'place', label:'Island'}; }
+  if(t==='city') return {kind:'city', label:'City'};
+  if(k==='natural'){ if(v==='peak') return {kind:'park', label:'Peak'}; if(v==='volcano') return {kind:'park', label:'Volcano'};
+    if(/^(water|bay|strait|lake|wetland)$/.test(v)) return {kind:'water', label:'Water'};
+    if(v==='beach') return {kind:'place', label:'Beach'}; return {kind:'park', label:'Nature'}; }
+  if(k==='waterway'||v==='river') return {kind:'water', label:'River'};
+  if(k==='boundary'&&(v==='national_park'||v==='protected_area')) return {kind:'park', label:'National Park'};
+  if(k==='leisure'&&(v==='park'||v==='nature_reserve'||v==='garden')) return {kind:'park', label:'Park'};
+  if(k==='tourism'){ if(v==='museum') return {kind:'place', label:'Museum'}; if(v==='attraction') return {kind:'place', label:'Attraction'}; return {kind:'place', label:'Landmark'}; }
+  if(k==='historic') return {kind:'place', label:'Historic site'};
+  if(k==='aeroway') return {kind:'place', label:'Airport'};
+  if(t==='street'||k==='highway') return {kind:'place', label:'Street'};
+  if(t==='house'||pr.housenumber) return {kind:'place', label:'Address'};
+  return {kind:'place', label:'Place'};
+}
+function jmCmp(a,b){ const an=normSearch(a.name), bn=normSearch(b.name);
+  let x=(an===jmNq?0:1)-(bn===jmNq?0:1); if(x) return x;                       // exact name match first
+  x=(an.startsWith(jmNq)?0:1)-(bn.startsWith(jmNq)?0:1); if(x) return x;       // then names that start with the query
+  x=(JM_RANK[a.kind]??6)-(JM_RANK[b.kind]??6); if(x) return x;                 // then by scale: country>region>city>landmark
+  return a.name.localeCompare(b.name);
+}
 function renderJmHits(){
   if(!jmHits.length){ jmRes.innerHTML = jmLoading ? '<div class="none">Searching…</div>' : '<div class="none">Nothing found</div>'; jmRes.classList.add('open'); return; }
   jmRes.innerHTML = jmHits.map((p,i)=>`<div class="sr" data-i="${i}"><span class="srl">${STOP_KINDS[p.kind]||ICON('pin',16)} ${p.name}${p.sub?` <span style="color:var(--muted);font-weight:400">· ${p.sub}</span>`:''}</span><small>${p.kindLabel||p.kind}</small></div>`).join('')
@@ -2838,30 +2871,31 @@ function renderJmHits(){
   jmRes.querySelectorAll('.sr').forEach(el=>el.onclick=()=>addStop(jmHits[+el.dataset.i]));
 }
 function runJmSearch(){
-  const q=jmSearch.value.trim(), ql=q.toLowerCase(), nq=normSearch(q);
-  if(!ql){ jmRes.classList.remove('open'); jmHits=[]; jmLoading=false; clearTimeout(jmGeoTimer); return; }
-  const order={country:0,city:1,unesco:2,park:3,water:4,place:5};
-  jmHits=stopIndex().filter(p=>normSearch(p.name).includes(nq))
-    .sort((a,b)=>{ const an=normSearch(a.name).startsWith(nq),bn=normSearch(b.name).startsWith(nq);
-      if(an!==bn) return an?-1:1; if(a.kind!==b.kind) return (order[a.kind]||9)-(order[b.kind]||9); return a.name.localeCompare(b.name); }).slice(0,6);
-  jmLoading = ql.length>=3;
+  const q=jmSearch.value.trim(); jmNq=normSearch(q);
+  if(!q){ jmRes.classList.remove('open'); jmHits=[]; jmLoading=false; clearTimeout(jmGeoTimer); return; }
+  jmHits=stopIndex().filter(p=>normSearch(p.name).includes(jmNq))
+    .map(p=>({...p, kindLabel:JM_LABEL[p.kind]||'Place'}))
+    .sort(jmCmp).slice(0,8);
+  jmLoading = q.length>=3;
   renderJmHits();
   // Geocode anything else (any city, region, landmark or address) via Photon (free, OpenStreetMap), debounced.
   clearTimeout(jmGeoTimer);
-  if(ql.length<3) return;
+  if(q.length<3) return;
   const seq=++jmGeoSeq;
   jmGeoTimer=setTimeout(()=>{
-    fetch('https://photon.komoot.io/api/?limit=6&q='+encodeURIComponent(q)).then(r=>r.ok?r.json():null).then(d=>{
+    fetch('https://photon.komoot.io/api/?limit=8&q='+encodeURIComponent(q)).then(r=>r.ok?r.json():null).then(d=>{
       if(seq!==jmGeoSeq) return; jmLoading=false;
       if(d&&Array.isArray(d.features)){
-        const seen=new Set(jmHits.map(h=>h.name.toLowerCase()));
+        const localNames=new Set(jmHits.map(h=>normSearch(h.name))), photonSeen=new Set();
         d.features.forEach(f=>{ const pr=f.properties||{}, c=(f.geometry||{}).coordinates;
-          if(!c||c.length<2||!pr.name) return; const key=pr.name.toLowerCase()+'@'+c[0].toFixed(2); if(seen.has(key)) return; seen.add(key);
-          const isCity = pr.osm_key==='place' && /^(city|town|village|hamlet|municipality|borough|suburb|locality)$/.test(pr.osm_value||'');
+          if(!c||c.length<2||!pr.name) return; const nn=normSearch(pr.name);
+          if(localNames.has(nn)) return;                              // already have it (e.g. a country) from the local index
+          const key=nn+'@'+c[0].toFixed(1)+','+c[1].toFixed(1); if(photonSeen.has(key)) return; photonSeen.add(key);
+          const cl=classifyPlace(pr);
           const sub=[pr.city&&pr.city!==pr.name?pr.city:null, pr.state, pr.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(', ');
-          jmHits.push({ name:pr.name, lon:c[0], lat:c[1], kind:isCity?'city':'place', sub, kindLabel:(pr.osm_value||'place').replace(/_/g,' ') });
+          jmHits.push({ name:pr.name, lon:c[0], lat:c[1], kind:cl.kind, kindLabel:cl.label, sub });
         });
-        jmHits=jmHits.slice(0,12);
+        jmHits.sort(jmCmp); jmHits=jmHits.slice(0,10);
       }
       renderJmHits();
     }).catch(()=>{ if(seq===jmGeoSeq){ jmLoading=false; renderJmHits(); } });
