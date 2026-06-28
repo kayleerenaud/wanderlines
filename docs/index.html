@@ -79,21 +79,21 @@
     --font-display:"Great Vibes","Pinyon Script",cursive; --font-hand:"Great Vibes",cursive;
   }
   :root{ --hdr:64px; }
-  /* per-vibe decorative surface: grain for earthy/classic, soft dots for cute, an OLED vignette for sleek.
-     Sits above the map + content (z5) but below all controls (z6+), and never intercepts taps. */
-  #vibe-tex{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;background-repeat:repeat;transition:opacity .25s}
-  /* earthy: gritty crumpled-paper. Low-freq turbulence run through diffuse-lighting makes soft wrinkle
-     shadows (multiplied onto the paper), with a fine grit speckle layered on top. */
-  [data-theme="earthy"] #vibe-tex{opacity:.62;mix-blend-mode:multiply;background-size:560px 560px, 150px 150px;
-    background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='w'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.015' numOctaves='5' seed='11' stitchTiles='stitch' result='t'/><feDiffuseLighting in='t' surfaceScale='4.6' diffuseConstant='1.1' lighting-color='%23ffffff'><feDistantLight azimuth='235' elevation='42'/></feDiffuseLighting></filter><rect width='100%25' height='100%25' filter='url(%23w)'/></svg>"),
-      url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.2 1.04'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>")}
-  [data-theme="classic"] #vibe-tex{opacity:.55;mix-blend-mode:multiply;background-size:180px 180px;
-    background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.3 1.05'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
-  [data-theme="cute"] #vibe-tex{opacity:.16;background-size:34px 34px;
-    background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><circle cx='9' cy='9' r='1.5' fill='%23e98fb8'/></svg>")}
+  /* Vibe textures are UNDERLAYS: each surface (body, cards, panels) carries the texture as its own
+     background via --tex, so content/text sit cleanly on top. #vibe-tex is now only the sleek vignette. */
+  #vibe-tex{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0}
   [data-theme="sleek"] #vibe-tex{opacity:1;background:
     radial-gradient(120% 95% at 50% 28%, rgba(255,255,255,.045), rgba(255,255,255,0) 40%),
     radial-gradient(150% 140% at 50% 58%, rgba(0,0,0,0) 46%, rgba(0,0,0,.96) 122%)}
+  /* earthy: gritty crumpled paper (raking-light turbulence) multiplied onto the surface color */
+  [data-theme="earthy"]{--tex-blend:multiply;--tex-size:560px 560px;
+    --tex:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='w'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.015' numOctaves='5' seed='11' stitchTiles='stitch' result='t'/><feDiffuseLighting in='t' surfaceScale='4' diffuseConstant='1.12' lighting-color='%23ffffff'><feDistantLight azimuth='235' elevation='44'/></feDiffuseLighting></filter><rect width='100%25' height='100%25' filter='url(%23w)'/></svg>")}
+  /* classic: faint warm paper grain (kept light per feedback) */
+  [data-theme="classic"]{--tex-blend:normal;--tex-size:190px 190px;
+    --tex:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='190' height='190'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.55 0.42'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
+  /* cute: very soft sparse dots */
+  [data-theme="cute"]{--tex-blend:normal;--tex-size:34px 34px;
+    --tex:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><circle cx='9' cy='9' r='1.5' fill='%23e98fb8' opacity='0.22'/></svg>")}
   /* script & bubble display fonts (classic calligraphy, cute bubble) read wrong spaced + uppercase:
      give those titles natural case and a size bump. Earthy uses Cinzel, which suits Roman caps, so it
      keeps the default uppercase treatment. */
@@ -112,7 +112,7 @@
   [data-theme="classic"] .brand small,[data-theme="cute"] .brand small{font-family:var(--font);text-transform:none;letter-spacing:.12em}
   [data-theme="classic"] .brand small{font-style:italic}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);background:var(--ocean);
+  html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);background-color:var(--ocean);
     font-family:var(--font)}
   /* every form control inherits the vibe's ink so text is never browser-default black on a dark field */
   input,textarea,select,button{color:var(--ink)}
@@ -152,7 +152,7 @@
   /* map view */
   #view-world,#view-region{background:radial-gradient(circle at 30% 18%, var(--ocean-hi), var(--ocean))}
   svg.map{display:block;width:100%;height:100%;touch-action:none}
-  .sphere{fill:var(--ocean)}
+  .sphere{fill:transparent}  /* ocean comes from the (textured) body behind the transparent map */
   .graticule{fill:none;stroke:var(--grid,#b79a6a);stroke-width:.5;opacity:.7}
   .country,.region{stroke:var(--land-stroke);stroke-width:.18;fill:var(--land);cursor:pointer;pointer-events:all}
   .region.region-flash{stroke:var(--accent)!important;animation:regflash .55s ease-in-out 3}
@@ -715,6 +715,10 @@
   .detail-actions{display:flex;gap:10px;margin-top:16px}
   .detail-actions .btn{flex:1;justify-content:center;padding:12px}
   .btn.danger{color:var(--accent);border-color:#d8b09e}
+  /* ---- vibe texture as a real surface UNDERLAY (placed last so it adds onto each surface's own
+     background-color without the earlier `background:` shorthands clearing it). Text sits on top. ---- */
+  body{background-image:var(--tex,none);background-size:var(--tex-size,auto);background-blend-mode:var(--tex-blend,normal)}
+  .card,.iti-card,.detail-card,header,#sheet,#layers-menu,#nav{background-image:var(--tex,none);background-size:var(--tex-size,auto);background-blend-mode:var(--tex-blend,normal)}
 </style>
 </head>
 <body>
