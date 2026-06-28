@@ -3246,13 +3246,22 @@ let cloudUser=null, cloudPushTimer=null, GOOGLE_READY=false;
 function authMsg(t,kind){ const el=$('auth-msg'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; el.style.color=(kind==='err')?'var(--accent)':'var(--muted)'; }
 
 // Hydrate the whole app from a saved cloud blob (same shape as Export/Backup), without a page reload.
+const _mergeRegion=(a,b)=>{ const out={...(a||{})}; for(const k in (b||{})) out[k]={...(a&&a[k]||{}), ...b[k]}; return out; };
+const _unionPairs=(a,b)=>{ a=Array.isArray(a)?a:[]; b=Array.isArray(b)?b:[]; const seen=new Set(a.map(e=>e[0])), out=a.slice(); b.forEach(e=>{ if(!seen.has(e[0])){ seen.add(e[0]); out.push(e); } }); return out; };
 function hydrateFromCloud(obj){
   const d=(obj&&obj.data)?obj.data:(obj||{});
-  state.marks=d.marks||{}; state.regionMarks=d.regionMarks||{}; state.places=d.places||{};
+  // Merge additive logs (don't replace): a site/country/airport logged on this device that hasn't
+  // synced yet is kept rather than wiped by the cloud copy. We only reach here when the cloud is at
+  // least as new as local, so the cloud wins on conflicting keys; local-only keys are preserved.
+  state.marks={...(state.marks||{}), ...(d.marks||{})};
+  state.regionMarks=_mergeRegion(state.regionMarks, d.regionMarks);
+  state.places={...(state.places||{}), ...(d.places||{})};
+  state.airports={...(state.airports||{}), ...(d.airports||{})};
   if(d.lists) state.lists=d.lists; state.journeys=Array.isArray(d.journeys)?d.journeys:[];
-  if(d.year) state.year=d.year; state.airports=d.airports||{}; state.extraUnesco=Array.isArray(d.extraUnesco)?d.extraUnesco:[];
+  if(d.year) state.year=d.year;
+  state.extraUnesco=_unionPairs(state.extraUnesco, d.extraUnesco);
   state.extraUnesco.forEach(e=>{ if(!LANDMARKS.unesco.some(([n])=>n===e[0])) LANDMARKS.unesco.push(e); });
-  state.extraParks=Array.isArray(d.extraParks)?d.extraParks:[];
+  state.extraParks=_unionPairs(state.extraParks, d.extraParks);
   state.extraParks.forEach(e=>{ if(!LANDMARKS.parks.some(([n])=>n===e[0])) LANDMARKS.parks.push(e); });
   if(obj&&obj.prefs){ if(obj.prefs.theme) applyTheme(obj.prefs.theme,true); if(obj.prefs.units) applyUnits(obj.prefs.units,true);
     state.nativeNames=!!obj.prefs.native; try{ localStorage.setItem('wl_native',obj.prefs.native?'1':'0'); }catch(e){} }
@@ -3377,14 +3386,17 @@ document.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML=ICON(el.data
 // ---------------- persistence: everything you log survives reloads ----------------
 let lastSaveTs='';
 function saveStateLocal(){ lastSaveTs=new Date().toISOString();
-  const blob=JSON.stringify({ _ts:lastSaveTs,
+  const payload={ _ts:lastSaveTs,
     marks:state.marks, regionMarks:state.regionMarks, places:state.places,
-    lists:state.lists, journeys:state.journeys, year:state.year, extraUnesco:state.extraUnesco, extraParks:state.extraParks, airports:state.airports });
-  try{ localStorage.setItem('wl_data',blob); }
-  catch(e){ // out of localStorage room (almost always oversized photos): shrink them and retry
-    if(!shrankPhotos){ shrinkExistingPhotos(); }
-    try{ localStorage.setItem('wl_data',blob); }catch(_){}
-  } }
+    lists:state.lists, journeys:state.journeys, year:state.year, extraUnesco:state.extraUnesco, extraParks:state.extraParks, airports:state.airports };
+  try{ localStorage.setItem('wl_data',JSON.stringify(payload)); return; }catch(e){}
+  // out of localStorage room (almost always oversized photos). Shrink photos for next time, and meanwhile
+  // GUARANTEE the small stuff (countries, sites, airports, journeys) still saves by writing a copy with
+  // journal photos stripped. Photos stay in memory and in the cloud, so nothing visible is lost.
+  if(!shrankPhotos) shrinkExistingPhotos();
+  try{ const slim={...payload, journeys:(state.journeys||[]).map(j=>({...j, journal:(j.journal||[]).map(en=>en&&en.photo?{...en,photo:null}:en)})) };
+    localStorage.setItem('wl_data',JSON.stringify(slim)); }catch(_){}
+}
 // saveState persists locally AND (when signed in) schedules a debounced sync to the cloud.
 // The local write is a full JSON.stringify of everything, so doing it on EVERY rapid change (e.g.
 // logging many airports or marking many countries in a row) stacks up and lags. We coalesce rapid
