@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Bungee&family=Caveat:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Chewy&family=Cinzel:wght@500;600;700;800&family=Great+Vibes&family=Inter:wght@300;400;600;700&family=Jost:wght@400;500;700&family=Monoton&family=Patrick+Hand&family=Quicksand:wght@400;600;700&family=Righteous&family=Shadows+Into+Light&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Bungee&family=Caveat:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Chewy&family=Cinzel:wght@500;600;700;800&family=Great+Vibes&family=Inter:wght@300;400;600;700&family=Jost:wght@400;500;700&family=Monoton&family=Share+Tech+Mono&family=Patrick+Hand&family=Quicksand:wght@400;600;700&family=Righteous&family=Shadows+Into+Light&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@master/qrcode.min.js"></script>
@@ -32,15 +32,15 @@
     --font:"Jost",-apple-system,"Segoe UI",sans-serif;
     --font-display:"Bungee","Jost",sans-serif; --font-hand:"Caveat",cursive;
   }
-  [data-theme="sleek"]{ /* sleek - chic & luxe: black, charcoal, champagne gold (lived) + bright platinum (visited) */
-    --on-accent:#171204;
-    --ocean:#000000; --ocean-hi:#0c0d10; --land:#272b31; --land-stroke:#05060a;
-    --paper:#0d0e11; --ink:#eef0f3; --muted:#8d93a0; --rule:#2c2f37;
-    --field:#15171b; --hover:#1e2128; --accent:#d6b06a; --accent2:#aeb6c0; --gold:#e6c789;
-    --c-lived:#d6b06a; --c-visited:#e9edf2;
-    --photo-filter:grayscale(.3) sepia(.1) contrast(1.12) brightness(1.02); --grain-opacity:.06; --route-dash:1 7; --grid:#7e858f;
-    --font:"Inter",-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
-    --font-display:"Inter",-apple-system,"SF Pro Display",sans-serif; --font-hand:"Inter",sans-serif;
+  [data-theme="sleek"]{ /* AGENT - undercover / tactical HUD: midnight blue, glowing blue-white grid, mono type */
+    --on-accent:#06182e;
+    --ocean:#0a1525; --ocean-hi:#0e2138; --land:#17283f; --land-stroke:#0a1525;
+    --paper:#0c1a2e; --ink:#dde9f5; --muted:#7d92ab; --rule:#274059;
+    --field:#102339; --hover:#16304d; --accent:#56c4ea; --accent2:#e8b85a; --gold:#e8b85a;
+    --c-lived:#e8b85a; --c-visited:#56c4ea;
+    --photo-filter:saturate(.95) contrast(1.12) brightness(1.0) hue-rotate(-8deg); --grain-opacity:.06; --route-dash:2 5; --grid:#9ec9e8;
+    --font:"Inter",-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --font-display:"Share Tech Mono","Space Mono",monospace; --font-hand:"Share Tech Mono",monospace;
   }
   [data-theme="disco"]{ /* disco - maximalist neon */
     --ocean:#16022c; --ocean-hi:#2a0750; --land:#2b0a47; --land-stroke:#ff2bd6;
@@ -82,11 +82,10 @@
   /* Vibe textures are UNDERLAYS: each surface (body, cards, panels) carries the texture as its own
      background via --tex, so content/text sit cleanly on top. #vibe-tex is now only the sleek vignette. */
   #vibe-tex{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0}
-  /* sleek: showroom gloss - a soft diagonal sheen streak + top highlight + deep edge vignette */
+  /* agent: tactical screen - faint blue glow in the center + deep midnight vignette at the edges */
   [data-theme="sleek"] #vibe-tex{opacity:1;background:
-    linear-gradient(122deg, rgba(255,255,255,0) 34%, rgba(255,255,255,.05) 45%, rgba(255,255,255,0) 53%),
-    radial-gradient(120% 95% at 50% 26%, rgba(255,255,255,.05), rgba(255,255,255,0) 40%),
-    radial-gradient(150% 140% at 50% 58%, rgba(0,0,0,0) 44%, rgba(0,0,0,.97) 122%)}
+    radial-gradient(120% 90% at 50% 32%, rgba(90,180,235,.07), rgba(90,180,235,0) 46%),
+    radial-gradient(150% 140% at 50% 56%, rgba(3,9,20,0) 42%, rgba(3,9,20,.95) 120%)}
   /* classic: burnt-parchment vignette (darkens only the far edges, like an aged map) */
   [data-theme="classic"] #vibe-tex{opacity:1;background:
     radial-gradient(135% 125% at 50% 46%, rgba(74,48,22,0) 60%, rgba(60,38,16,.5) 122%)}
@@ -3053,7 +3052,7 @@ document.getElementById('jm-delete').onclick=()=>{
 // ---- theme / vibe picker (token-driven; scaffolding untouched) ----
 const THEME_META=[
   {id:'retro',  name:'Retro',   sw:['#f7edd6','#c43e1a','#0e7c6f','#3b2f2a']},
-  {id:'sleek',  name:'Sleek',   sw:['#0d0e11','#d6b06a','#e9edf2','#272b31']},
+  {id:'sleek',  name:'Agent',   sw:['#0a1525','#56c4ea','#e8b85a','#17283f']},
   {id:'disco',  name:'Disco',   sw:['#1d0636','#ff2bd6','#1fe3cb','#f5e63d']},
   {id:'earthy', name:'Earthy',  sw:['#d2dec2','#b06a26','#6f9540','#33442a']},
   {id:'cute',   name:'Cute',    sw:['#ffe2ef','#f06bb0','#f2c63f','#e8478f']},
@@ -3486,7 +3485,7 @@ const signout=$('signout-btn'); if(signout) signout.onclick=async()=>{
 let savedTheme='retro'; try{ savedTheme=localStorage.getItem('wl_theme')||'retro'; }catch(e){}
 // optional per-vibe custom title fonts: if prototype/fonts/<vibe>-title.ttf exists it's used,
 // otherwise the curated web font stays (no broken @font-face when the file is absent)
-const VIBE_DISPLAY={retro:'"Bungee","Jost",sans-serif',sleek:'"Inter",-apple-system,sans-serif',
+const VIBE_DISPLAY={retro:'"Bungee","Jost",sans-serif',sleek:'"Share Tech Mono","Space Mono",monospace',
   disco:'"Monoton","Righteous",sans-serif',earthy:'"Cinzel","Trajan Pro",serif',
   cute:'"Chewy","Baloo 2",cursive',classic:'"Great Vibes","Pinyon Script",cursive'};
 const customFontStyle=document.createElement('style'); document.head.appendChild(customFontStyle);
