@@ -1192,14 +1192,16 @@ const state = {
         {date:'2024-11-13',text:'Arenal showed off at dusk: a flawless cone, then hot springs to soak the hiking out of our legs. This is the one I’d come back for.',photo:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Arenal_volcano_%2870785p%29_%28cropped%29.jpg/3840px-Arenal_volcano_%2870785p%29_%28cropped%29.jpg'} ] },
   ],
 };
-const SEED = {'840':['lived',2015],'124':['visited',2019],'076':['visited',2023],
-  '826':['visited',2017],'250':['visited',2017],'724':['visited',2022],'392':['visited',2024],
-  '356':['wishlist',2026],'036':['wishlist',2026],'152':['lived',2020],'484':['visited',2018]};
-Object.entries(SEED).forEach(([k,v])=>state.marks[k]={listId:v[0],year:v[1]});
-// Snapshot the onboarding defaults so a brand-new account can start clean (no demo countries),
-// while still keeping the one example journey to show how it works.
+// Snapshot the onboarding defaults so a brand-new account can be seeded later (after sign-in confirms
+// it really is new) with the one Example Journey to show how it works.
 const SEED_JOURNEYS = JSON.parse(JSON.stringify(state.journeys));
 const DEFAULT_LISTS = JSON.parse(JSON.stringify(state.lists));
+// Start EVERY fresh load clean. The Example Journey + any demo countries must never appear as a
+// pre-sign-in placeholder (that looked like "wrong data loaded" in incognito / on a new device).
+// Your real data arrives from this device's saved copy (loadState) or the cloud (onSignedIn), and a
+// genuinely new account is seeded the Example by freshStartState.
+state.journeys = [];
+state.marks = {};
 
 // hover-to-name is for real pointers only; on touch we use tap-to-reveal instead
 const HOVER = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
@@ -3646,7 +3648,7 @@ Object.keys(VIBE_DISPLAY).forEach(vibe=>{
   }catch(_){}
 });
 // app version (build.mjs injects the real number) so you can confirm you're on the latest build
-const APP_VER='v65';
+const APP_VER='v66';
 try{ const vl=document.getElementById('app-ver-line'); if(vl) vl.textContent='Wanderlines '+(APP_VER.indexOf('APP_VER')>=0?'(dev)':APP_VER); }catch(_){}
 // paint our own line-icons into every static [data-icon] slot (no emoji)
 document.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML=ICON(el.dataset.icon, +(el.dataset.isz)||18); });
