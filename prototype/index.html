@@ -180,7 +180,7 @@
   #view-world,#view-region{background:radial-gradient(circle at 30% 18%, var(--ocean-hi), var(--ocean))}
   svg.map{display:block;width:100%;height:100%;touch-action:none}
   .sphere{fill:transparent}  /* ocean comes from the (textured) body behind the transparent map */
-  .graticule{fill:none;stroke:var(--grid,#b79a6a);stroke-width:.36;opacity:.7}
+  .graticule{fill:none;stroke:var(--grid,#b79a6a);stroke-width:.22;opacity:.7}
   [data-theme="classic"] .graticule{stroke-dasharray:1.4 2.4;opacity:.9}   /* treasure-map dashed grid */
   [data-theme="sleek"] .graticule{opacity:.8}
   [data-theme="disco"] .graticule{opacity:.85}
@@ -1408,7 +1408,7 @@ function drawWorld(){
       // deep-zoomed coastlines read crisply instead of fading to an invisible hairline
       const grow=Math.min(1+(wk-1)*0.13, 3);
       wLand.selectAll('path').attr('stroke-width',d=>(state.marks[d.id]&&isWish(state.marks[d.id])?0.9:0.18)*grow/wk);
-      wSphere.selectAll('.graticule').attr('stroke-width',0.36/wk);
+      wSphere.selectAll('.graticule').attr('stroke-width',0.22/wk);
       wMarks.selectAll('circle').attr('r',5/wk);
       if(state.activeRoute||state.allRoutes||state.journeyOverlay) renderRoute();
     });
