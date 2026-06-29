@@ -1,6 +1,6 @@
 /* Wanderlines service worker: caches the app shell so it installs and launches offline.
    The map tiles and country data still come from the network (free public APIs). */
-const CACHE = 'wanderlines-v72';
+const CACHE = 'wanderlines-v73';
 const SHELL = [
   './',
   './index.html',
