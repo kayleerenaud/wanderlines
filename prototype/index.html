@@ -32,7 +32,7 @@
     --field:#102339; --hover:#16304d; --accent:#56c4ea; --accent2:#9bb9d6; --gold:#a8c6e0;
     --c-lived:#e9f4fd; --c-visited:#56c4ea; --c-wish:#3a557a;
     --lm-park:#3fb6a0; --lm-unesco:#9a7cf0; --pin-ring:#bfe0f2;
-    --photo-filter:saturate(.95) contrast(1.12) brightness(1.0) hue-rotate(-8deg); --grain-opacity:.06; --route-dash:2 5; --grid:#d3e4f3; --hud:#6f9fc4;
+    --photo-filter:saturate(.87) contrast(1.12) brightness(1.0) hue-rotate(-8deg); --grain-opacity:.06; --route-dash:2 5; --grid:#d3e4f3; --hud:#6f9fc4;
     --font:"Inter",-apple-system,"Helvetica Neue",Arial,sans-serif;
     --font-display:"Share Tech Mono","Space Mono",monospace; --font-hand:"Share Tech Mono",monospace;
   }
@@ -518,6 +518,8 @@
   [data-theme="sleek"] .je-photo.f-none::before,[data-theme="sleek"] .je-photo.f-none::after{content:"";position:absolute;width:13px;height:13px;border:1.5px solid #56c4ea;opacity:.85;z-index:2}
   [data-theme="sleek"] .je-photo.f-none::before{top:2px;left:2px;border-right:none;border-bottom:none}
   [data-theme="sleek"] .je-photo.f-none::after{bottom:2px;right:2px;border-left:none;border-top:none}
+  /* Spyware: a faint cool blue cast over the photo (pairs with the 8% desaturation in --photo-filter) */
+  [data-theme="sleek"] .je-photo .ph::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:rgba(102,158,212,.1);mix-blend-mode:soft-light}
   .je-photo.f-film{padding:18px 11px;background:#191919;border-radius:5px;box-shadow:0 4px 14px #0004}
   .je-photo.f-film::before,.je-photo.f-film::after{content:"";position:absolute;left:11px;right:11px;height:8px;background:repeating-linear-gradient(90deg,#0000 0 5px,#d9d9d9 5px 11px);opacity:.6}
   .je-photo.f-film::before{top:5px}.je-photo.f-film::after{bottom:5px}
