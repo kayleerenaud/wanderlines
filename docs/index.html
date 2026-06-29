@@ -2314,6 +2314,30 @@ function drawScratchMap(x, gx, gy, gw, gh, t){
     if(m){ col = isWish(m) ? t.wish : (colorFor(m)||t.land); }
     x.fillStyle=col; x.fill(); x.lineWidth=0.5; x.strokeStyle=t.stroke; x.stroke(); });
 }
+function _rgba(hex,a){ hex=(hex||'').replace('#',''); if(hex.length===3) hex=hex.replace(/./g,'$&$&'); const n=parseInt(hex||'888888',16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+// Paint the CURRENT theme's signature background (the one we designed per vibe) into a canvas rect,
+// so shared passport cards carry the same backdrop people see in the app.
+function drawThemeBg(x, rx, ry, rw, rh, tok){
+  const theme=state.theme, cx=rx+rw/2, cy=ry+rh/2, R=Math.hypot(rw,rh), mn=Math.min(rw,rh);
+  x.save(); x.beginPath(); x.rect(rx,ry,rw,rh); x.clip();
+  x.fillStyle=tok('--ocean','#eee'); x.fillRect(rx,ry,rw,rh);
+  if(theme==='earthy'){                 // Vintage: centered gold sunburst + warm core glow
+    x.save(); x.translate(cx,cy); x.fillStyle=_rgba(tok('--gold','#c9a23f'),0.08);
+    for(let i=0;i<24;i++){ const a0=i*15*Math.PI/180, a1=(i*15+7.5)*Math.PI/180; x.beginPath(); x.moveTo(0,0); x.arc(0,0,R,a0,a1); x.closePath(); x.fill(); } x.restore();
+    const g=x.createRadialGradient(cx,cy,0,cx,cy,rw*0.5); g.addColorStop(0,'rgba(255,243,216,.5)'); g.addColorStop(1,'rgba(255,243,216,0)'); x.fillStyle=g; x.fillRect(rx,ry,rw,rh);
+  } else if(theme==='retro'){           // Retro: 70s rainbow arcs in two opposite corners
+    [[rx+rw,ry,['#1a2c52','#2e8ca2','#f3cd84','#ee7d35','#dd4327']],
+     [rx,ry+rh,['#dd4327','#ee7d35','#f3cd84','#2e8ca2','#1a2c52']]].forEach(([ox,oy,cols])=>{
+      x.lineWidth=mn*0.05; cols.forEach((c,i)=>{ x.beginPath(); x.arc(ox,oy,mn*(0.34+i*0.07),0,Math.PI*2); x.strokeStyle=_rgba(c,0.32); x.stroke(); }); });
+  } else if(theme==='sleek'){           // Spyware: white HUD core glow
+    const g=x.createRadialGradient(cx,cy,0,cx,cy,rw*0.55); g.addColorStop(0,'rgba(255,255,255,.16)'); g.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=g; x.fillRect(rx,ry,rw,rh);
+  } else if(theme==='disco'){           // Disco: neon center glow
+    const g=x.createRadialGradient(cx,cy,0,cx,cy,rw*0.55); g.addColorStop(0,_rgba(tok('--accent','#ff2bd6'),0.16)); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(rx,ry,rw,rh);
+  } else if(theme==='cute'){            // Bubblegum: a few soft bubbles
+    x.lineWidth=Math.max(2,mn*0.012); [[0.22,0.3,0.07],[0.72,0.62,0.09],[0.5,0.82,0.055],[0.86,0.24,0.05]].forEach(([fx,fy,fr])=>{ x.beginPath(); x.arc(rx+rw*fx,ry+rh*fy,mn*fr,0,Math.PI*2); x.strokeStyle='rgba(255,255,255,.5)'; x.stroke(); });
+  }                                     // classic: the ocean tone already reads as parchment
+  x.restore();
+}
 async function buildPassportCard(){
   try{ await (document.fonts&&document.fonts.ready); }catch(e){}
   await ensureWfeats();
@@ -2331,8 +2355,8 @@ async function buildPassportCard(){
   // continent tallies
   const cont={}; visited.forEach(id=>{ const c=continentOf(id); cont[c]=(cont[c]||0)+1; });
   const W=1080,H=1350,M=46; const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
-  // backdrop
-  x.fillStyle=ocean; x.fillRect(0,0,W,H);
+  // backdrop - the chosen theme's signature background
+  drawThemeBg(x,0,0,W,H,tok);
   rrect(x,M,M,W-2*M,H-2*M,40); x.fillStyle=paper; x.fill();
   x.lineWidth=5; x.strokeStyle=accent; x.stroke();
   x.save(); x.setLineDash([3,9]); x.lineWidth=2; x.strokeStyle=accent; rrect(x,M+22,M+22,W-2*M-44,H-2*M-44,26); x.stroke(); x.restore();
@@ -2349,7 +2373,7 @@ async function buildPassportCard(){
   // scratch-off world map - the user's colored countries
   const mapX=M+34, mapW=W-2*(M+34), mapH=336, landTok=tok('--land','#cdbfa6'), landStroke=tok('--land-stroke',rule), wishFill=tok('--c-wish', mixHex(landTok,paper,0.66));
   x.textAlign='left'; x.fillStyle=accent; x.font='600 22px '+fBody; x.fillText('YOUR MAP',mapX+4,cy); cy+=16;
-  rrect(x,mapX,cy,mapW,mapH,16); x.save(); x.clip(); x.fillStyle=ocean; x.fillRect(mapX,cy,mapW,mapH);
+  rrect(x,mapX,cy,mapW,mapH,16); x.save(); x.clip(); drawThemeBg(x,mapX,cy,mapW,mapH,tok);
   drawScratchMap(x, mapX+12, cy+10, mapW-24, mapH-20, {land:landTok, stroke:landStroke, wish:wishFill}); x.restore();
   x.lineWidth=1.5; x.strokeStyle=rule; rrect(x,mapX,cy,mapW,mapH,16); x.stroke(); cy+=mapH+30;
   // flags
@@ -3706,7 +3730,7 @@ Object.keys(VIBE_DISPLAY).forEach(vibe=>{
   }catch(_){}
 });
 // app version (build.mjs injects the real number) so you can confirm you're on the latest build
-const APP_VER='v85';
+const APP_VER='v86';
 try{ const vl=document.getElementById('app-ver-line'); if(vl) vl.textContent='Wanderlines '+(APP_VER.indexOf('APP_VER')>=0?'(dev)':APP_VER); }catch(_){}
 // paint our own line-icons into every static [data-icon] slot (no emoji)
 document.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML=ICON(el.dataset.icon, +(el.dataset.isz)||18); });
