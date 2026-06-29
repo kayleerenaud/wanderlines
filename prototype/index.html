@@ -2638,7 +2638,7 @@ function renderJourneys(){
 }
 document.getElementById('route-clear').onclick=clearRoute;
 // click the journey name in the route banner → back to that journey's page; ✕ → full map
-document.getElementById('route-name').onclick=()=>{ if(state.activeRoute) openItinerary(state.activeRoute); };
+document.getElementById('route-name').onclick=()=>{ if(state.activeRoute) openItinerary(state.activeRoute); else if(state.allRoutes) go('journeys'); };
 
 // One-time migration: old per-stop "memories" notes become standalone journal entries
 // ("<Stop name>! <the note>"), so nothing is lost now that Route is just the route.

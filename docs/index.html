@@ -2647,7 +2647,7 @@ function renderJourneys(){
 }
 document.getElementById('route-clear').onclick=clearRoute;
 // click the journey name in the route banner → back to that journey's page; ✕ → full map
-document.getElementById('route-name').onclick=()=>{ if(state.activeRoute) openItinerary(state.activeRoute); };
+document.getElementById('route-name').onclick=()=>{ if(state.activeRoute) openItinerary(state.activeRoute); else if(state.allRoutes) go('journeys'); };
 
 // One-time migration: old per-stop "memories" notes become standalone journal entries
 // ("<Stop name>! <the note>"), so nothing is lost now that Route is just the route.
@@ -3646,7 +3646,7 @@ Object.keys(VIBE_DISPLAY).forEach(vibe=>{
   }catch(_){}
 });
 // app version (build.mjs injects the real number) so you can confirm you're on the latest build
-const APP_VER='v64';
+const APP_VER='v65';
 try{ const vl=document.getElementById('app-ver-line'); if(vl) vl.textContent='Wanderlines '+(APP_VER.indexOf('APP_VER')>=0?'(dev)':APP_VER); }catch(_){}
 // paint our own line-icons into every static [data-icon] slot (no emoji)
 document.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML=ICON(el.dataset.icon, +(el.dataset.isz)||18); });
