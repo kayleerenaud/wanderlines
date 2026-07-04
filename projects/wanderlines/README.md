@@ -2,16 +2,19 @@
 
 A **travel log** (not a planner) for trips you've already taken: the ground you
 covered, the routes you traveled, how it went, and cute, shareable maps. Built to
-stay **100% free** for everyone: no paid APIs, no backend required for the slice.
+stay **100% free** for everyone: no paid APIs.
 
-This is the materialized real project. The full clickable design prototype lives at
-[`/prototype/index.html`](../../prototype/index.html) and is the source of truth for
-the whole experience; this project is the **clean, tested core** of that design.
+The app itself is a single self-contained PWA at
+[`/prototype/index.html`](../../prototype/index.html) (the source of truth for the
+whole experience). This folder is its **tested core**: the pure domain + cloud-sync
+logic in `src/core.mjs`, which is embedded verbatim into the app at build time — so
+the rules the tests verify are the exact rules that ship.
 
-## Run
+## Build & run
 
 ```bash
-node serve.mjs            # serves http://127.0.0.1:5173
+node ../../build.mjs      # embed src/core.mjs into the prototype + write the deployable /docs build
+node serve.mjs            # serve that build at http://127.0.0.1:5173
 ```
 
 No dependencies, no install step.
@@ -19,24 +22,29 @@ No dependencies, no install step.
 ## Test
 
 ```bash
-node test/core.test.mjs   # exits non-zero on failure (33 assertions)
+node test/core.test.mjs   # zero-dep assertions over the shared core (exits non-zero on failure)
 ```
 
-## Layout
+## How the core is shared (no parallel copy)
+
+`src/core.mjs` is a dependency-free ES module. It is imported directly by the Node test
+suite, **and** `build.mjs` strips its `export`s, wraps it in an IIFE, and injects it into
+a generated region in `prototype/index.html` (bound to the app's live `state.lists` by a
+thin adapter). There is exactly one copy of this logic; the app can't drift from its tests.
 
 | Path | What |
 | --- | --- |
-| `src/core.mjs` | Dependency-free domain logic: distance, **miles/km**, journey stats, the six vibes (distinct display fonts), and the **multi-visit model** (a location can hold several `{listId, year}` visits; lived > visited > wish primary). Shared by UI **and** tests. |
-| `src/icons.mjs` | Our own single-stroke line-icons (no emoji): vehicles + stop kinds. |
-| `src/data.mjs` | Seed journeys (mocked, no backend). |
-| `src/app.mjs` | The Journeys-log web slice + vibe switcher + miles/km toggle. |
-| `styles.css` | Fully token-driven: every color/font is a CSS variable the app swaps per vibe. |
-| `test/core.test.mjs` | Zero-dep assertions over the core, incl. the multi-visit rules. |
-| `serve.mjs` | Tiny static server. |
+| `src/core.mjs` | The **only** home of the pure logic: the **multi-visit model** (a place can hold several `{listId, year}` visits; lived > visited > wish primary; `isWish`/`colorFor`/`yearsTraveled`), and the **cloud-sync merge rules** (`reattachPhotos`, `mergeJourneys`, `mergeLocalInto`, `unionPairs`) that keep data safe across devices. |
+| `test/core.test.mjs` | Zero-dep assertions over that core — the multi-visit rules and the sync/merge data-safety guarantees (photos survive a changed journey id; a two-sided conflict unions rather than dropping a side). |
+| `serve.mjs` | Tiny static server for the built `/docs` PWA. |
+| `../../build.mjs` | Embeds the core into the prototype and writes `/docs`. |
 
-## The full app (in the prototype)
+Rendering, the map projection (`d3.geoDistance`), theming (CSS custom properties), and DOM
+wiring live in the app where they belong — only genuinely pure, testable logic is in the core.
 
-The design preview is a single self-contained file and covers the whole product:
+## The app (in the prototype)
+
+A single self-contained file covering the whole product:
 
 - **World map**: scratch-off countries (tap to cycle Visited → Lived → Wish → clear);
   long-hold opens a detail sheet supporting **multiple visits per place, each with its
@@ -49,15 +57,4 @@ The design preview is a single self-contained file and covers the whole product:
 - **Account / Passport**: six vibes, miles/km, native names, collectible **stamps,
   flags & badges**, and three share faces: a generated **passport card** (PNG), a
   **live Leaflet map** with swappable free base-map styles, and a **QR share link**,
-  plus **JSON backup / export & import**.
-
-The `core.mjs` here is the tested heart of that design: the same numbers and the same
-multi-visit rules the app shows, verified by the suite.
-
-## Scope of this slice
-
-The Journeys log: real journey cards whose **ground-covered (miles by default), day
-count, stops, rating, vehicles, and kind-tagged stops** are rendered with our own
-line-icons and computed by the same `core.mjs` the tests verify, plus the six
-token-driven vibes (retro / sleek / disco / earthy / cute / classic), each with a
-distinct title font, switchable live, and a **Miles ⇄ Kilometers** toggle.
+  plus **JSON backup / export & import**, and optional cloud sync across devices.
