@@ -19,7 +19,7 @@
     --ocean:#ece0c3; --ocean-hi:#f4ebd4; --land:#1a2c52; --land-stroke:#ece0c3;
     --paper:#f4e9d0; --ink:#2a2016; --muted:#8a7a60; --rule:#d8b257;
     --field:#fbf3df; --hover:#f3e6c5; --accent:#dd4327; --accent2:#2e8ca2; --gold:#ee7d35; --on-accent:#fff7ea;
-    --c-lived:#dd4327; --c-visited:#2e8ca2; --c-wish:#e7a52e; --on-accent:#fff7ea;
+    --c-lived:#dd4327; --c-visited:#2e8ca2; --c-wish:#e7a52e;
     --lm-park:#4f8a4a; --lm-unesco:#7d5ba6; --pin-ring:#fbf3df;
     --photo-filter:sepia(.28) saturate(1.22) contrast(1.08) brightness(1.01); --grain-opacity:.15; --route-dash:7 4; --grid:#bf9742;
     --font:"Jost",-apple-system,"Segoe UI",sans-serif;
@@ -78,8 +78,7 @@
   }
   :root{ --hdr:64px; }
   /* Vibe textures are UNDERLAYS: each surface (body, cards, panels) carries the texture as its own
-     background via --tex, so content/text sit cleanly on top. #vibe-tex is now only the sleek vignette. */
-  #vibe-tex{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0}
+     background via --tex, so content/text sit cleanly on top. */
   /* Atmospheric light is painted as the MAP's own background, so it sits BEHIND the countries,
      stays centered on the map, and only appears on the map views (never the content pages):
      a glow lit from within + a depth vignette, tuned per vibe. Disco stays clean (no gradient). */
@@ -811,7 +810,6 @@
 </style>
 </head>
 <body>
-<div id="vibe-tex" aria-hidden="true"></div>
 <div id="app">
   <header>
     <div class="brand" id="brand" title="Home · World Map" style="cursor:pointer">Wanderlines<small>✦ places i've been ✦</small></div>
@@ -2334,8 +2332,8 @@ async function buildPassportCard(){
   await ensureWfeats();
   const cs=getComputedStyle(document.documentElement), tok=(n,f)=>(cs.getPropertyValue(n).trim()||f);
   const paper=tok('--paper','#f7efe0'), ink=tok('--ink','#2a2118'), muted=tok('--muted','#9a8f7d'),
-    accent=tok('--accent','#d4561f'), accent2=tok('--accent2','#caa24a'), ocean=tok('--ocean','#efe4cf'),
-    field=tok('--field','#fff'), rule=tok('--rule','#0002'), onAcc=tok('--on-accent','#fff'),
+    accent=tok('--accent','#d4561f'),
+    field=tok('--field','#fff'), rule=tok('--rule','#0002'),
     fDisp=tok('--font-display','700 system-ui'), fBody=tok('--font','system-ui'), fHand=tok('--font-hand',fBody);
   const visited=Object.entries(state.marks).filter(([id,m])=>!isWish(m)).map(([id])=>id);
   const wish=Object.values(state.marks).filter(m=>isWish(m)).length;
@@ -2582,7 +2580,7 @@ function maybeShowShared(){
     document.getElementById('shared-view').innerHTML=`<div class="shared-card">
       <div class="eyebrow" style="color:var(--accent)">Wanderlines passport</div>
       <h2 style="font-family:var(--font-display);margin:6px 0 2px">${(data.n||'A traveler')}</h2>
-      <p class="lead" style="margin:0 0 14px">${codes.length} countries · ${Math.round(codes.length/195*100)}% of the world</p>
+      <p class="lead" style="margin:0 0 14px">${codes.length} countries · ${Math.round(codes.length/177*100)}% of the world</p>
       <div class="flag-grid">${flags}</div>
       <button class="btn primary" id="shared-dismiss" style="margin-top:18px;width:100%;justify-content:center">Make your own ›</button></div>`;
     document.getElementById('shared-view').classList.add('open');
@@ -3217,8 +3215,6 @@ function applyNames(on,save){
 document.querySelectorAll('#names-seg button').forEach(b=>b.onclick=()=>applyNames(b.dataset.nn==='1',true));
 
 // ---------------- share (OS share sheet) ----------------
-function currentMapSvg(){ return document.getElementById('view-world').classList.contains('hidden')
-  ? document.getElementById('region-svg') : document.getElementById('world-svg'); }
 async function shareMap(svgNode){
   const w=svgNode.clientWidth,h=svgNode.clientHeight,scale=2;
   const clone=svgNode.cloneNode(true);
