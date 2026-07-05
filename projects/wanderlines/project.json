@@ -3,9 +3,9 @@
   "slug": "wanderlines",
   "kind": "web",
   "runtime": "node",
-  "build_cmd": null,
+  "build_cmd": ["node", "../../build.mjs"],
   "run_cmd": ["node", "serve.mjs"],
-  "entrypoint": "index.html",
+  "entrypoint": "../../prototype/index.html",
   "status": "ready",
-  "notes": "Travel LOG (not planner). Web app. Stays 100% free, no paid APIs. Domain logic in src/core.mjs is dependency-free and Node-testable (test/core.test.mjs); the UI (src/app.mjs) and the tests share it. Six token-driven vibes. Full design prototype lives in /prototype/index.html."
+  "notes": "Travel LOG (not planner). Web app. Stays 100% free, no paid APIs. The app is /prototype/index.html; `node ../../build.mjs` embeds the shared core (src/core.mjs) and writes the deployable build to /docs, which `serve.mjs` serves. Domain + cloud-sync logic lives ONLY in src/core.mjs — dependency-free, Node-tested (test/core.test.mjs), and embedded verbatim into the app at build time, so the tests cover the exact logic that ships."
 }

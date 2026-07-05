@@ -19,7 +19,7 @@
     --ocean:#ece0c3; --ocean-hi:#f4ebd4; --land:#1a2c52; --land-stroke:#ece0c3;
     --paper:#f4e9d0; --ink:#2a2016; --muted:#8a7a60; --rule:#d8b257;
     --field:#fbf3df; --hover:#f3e6c5; --accent:#dd4327; --accent2:#2e8ca2; --gold:#ee7d35; --on-accent:#fff7ea;
-    --c-lived:#dd4327; --c-visited:#2e8ca2; --c-wish:#e7a52e; --on-accent:#fff7ea;
+    --c-lived:#dd4327; --c-visited:#e7a52e; --c-wish:#2e8ca2;
     --lm-park:#4f8a4a; --lm-unesco:#7d5ba6; --pin-ring:#fbf3df;
     --photo-filter:sepia(.28) saturate(1.22) contrast(1.08) brightness(1.01); --grain-opacity:.15; --route-dash:7 4; --grid:#bf9742;
     --font:"Jost",-apple-system,"Segoe UI",sans-serif;
@@ -78,8 +78,7 @@
   }
   :root{ --hdr:64px; }
   /* Vibe textures are UNDERLAYS: each surface (body, cards, panels) carries the texture as its own
-     background via --tex, so content/text sit cleanly on top. #vibe-tex is now only the sleek vignette. */
-  #vibe-tex{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0}
+     background via --tex, so content/text sit cleanly on top. */
   /* Atmospheric light is painted as the MAP's own background, so it sits BEHIND the countries,
      stays centered on the map, and only appears on the map views (never the content pages):
      a glow lit from within + a depth vignette, tuned per vibe. Disco stays clean (no gradient). */
@@ -811,7 +810,6 @@
 </style>
 </head>
 <body>
-<div id="vibe-tex" aria-hidden="true"></div>
 <div id="app">
   <header>
     <div class="brand" id="brand" title="Home · World Map" style="cursor:pointer">Wanderlines<small>✦ places i've been ✦</small></div>
@@ -1253,15 +1251,214 @@ state.marks = {};
 
 // hover-to-name is for real pointers only; on touch we use tap-to-reveal instead
 const HOVER = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
-const listById = id => state.lists.find(l=>l.id===id);
-const colorFor = mark => { if(!mark) return null; const l=listById(mark.listId); return l && !l.wish ? l.color : null; };
-const isWish   = mark => { const l=mark&&listById(mark.listId); return !!(l&&l.wish); };
-// ----- multi-visit model: a location can hold several {listId,year} visits; listId/year mirror the "primary" one -----
-function visitsOf(m){ if(!m) return []; if(Array.isArray(m.visits)&&m.visits.length) return m.visits; return [{listId:m.listId, year:m.year}]; }
-function listRank(id){ const l=listById(id); if(!l) return 1; if(l.wish) return 0; if(l.id==='lived') return 3; return 2; }
-function primaryVisit(m){ const vs=visitsOf(m); if(!vs.length) return null;
-  return vs.slice().sort((a,b)=>{ const r=listRank(b.listId)-listRank(a.listId); return r||((+b.year||0)-(+a.year||0)); })[0]; }
-function syncPrimary(m){ if(!m) return m; const p=primaryVisit(m); if(p){ m.listId=p.listId; m.year=p.year; } return m; }
+// ==== core:begin ==== GENERATED from projects/wanderlines/src/core.mjs by build.mjs — DO NOT EDIT HERE.
+// One source of truth: core.mjs (imported by the Node tests) embedded here + bound to state.lists below.
+// The rules the tests verify are the exact rules the app runs. Run `node build.mjs` to refresh this block.
+const __wlcore = (() => {
+// Wanderlines: pure, dependency-free domain + sync logic.
+//
+// This is the SINGLE SOURCE OF TRUTH for the app's non-DOM logic. The Node test suite
+// (test/core.test.mjs) imports it directly, and the web app (prototype/index.html) embeds
+// it verbatim at build time (build.mjs injects this file into a generated <core> region and
+// wraps it with a thin adapter that binds `state.lists`). So the numbers and merge rules the
+// tests verify are the exact ones the shipped app runs — no parallel copy to drift.
+//
+// Only genuinely pure, testable logic lives here. Rendering, the map projection (d3.geoDistance),
+// theming (CSS custom properties), and DOM wiring stay in the app where they belong.
+
+// ---------------------------------------------------------------------------
+// Multi-visit model
+//
+// A logged location can hold SEVERAL visits, each its own {listId, year}. The map paints by the
+// "primary" visit: the highest-priority list (lived > visited/other > unknown > wish), breaking
+// ties by the most recent year. `listId`/`year` on a mark mirror that primary (via syncPrimary)
+// so single-value consumers keep working. isWish/colorFor route through the primary so they stay
+// correct even if a mark's mirrored listId ever lags its visits.
+// ---------------------------------------------------------------------------
+
+const LISTS = [
+  { id: "lived", name: "Lived", color: "#b5532a" },
+  { id: "visited", name: "Visited", color: "#1f6f6b" },
+  { id: "wishlist", name: "Wish List", color: null, wish: true },
+];
+
+/** Look up a list by id within a lists array. */
+function listById(lists, id) { return (lists || []).find((l) => l.id === id); }
+
+/** Every visit on a mark; falls back to a single {listId, year} for legacy marks. */
+function visitsOf(mark) {
+  if (!mark) return [];
+  if (Array.isArray(mark.visits) && mark.visits.length) return mark.visits;
+  return [{ listId: mark.listId, year: mark.year }];
+}
+
+/** Priority of a list: lived (3) > visited/other (2) > unknown (1) > wish (0). */
+function listRank(id, lists = LISTS) {
+  const l = listById(lists, id);
+  if (!l) return 1;
+  if (l.wish) return 0;
+  if (l.id === "lived") return 3;
+  return 2;
+}
+
+/** The representative visit a mark is painted/sorted by. */
+function primaryVisit(mark, lists = LISTS) {
+  const vs = visitsOf(mark);
+  if (!vs.length) return null;
+  return vs.slice().sort((a, b) => {
+    const r = listRank(b.listId, lists) - listRank(a.listId, lists);
+    return r || (+b.year || 0) - (+a.year || 0);
+  })[0];
+}
+
+/** Mirror listId/year onto the mark from its primary visit (returns the mark). */
+function syncPrimary(mark, lists = LISTS) {
+  if (!mark) return mark;
+  const p = primaryVisit(mark, lists);
+  if (p) { mark.listId = p.listId; mark.year = p.year; }
+  return mark;
+}
+
+/** A mark is "wish" only when its primary visit is a wish-list visit. */
+function isWish(mark, lists = LISTS) {
+  const p = primaryVisit(mark, lists);
+  const l = p && listById(lists, p.listId);
+  return !!(l && l.wish);
+}
+
+/** The scratch-off color for a mark (null for wish / unknown). */
+function colorFor(mark, lists = LISTS) {
+  const p = primaryVisit(mark, lists);
+  const l = p && listById(lists, p.listId);
+  return l && !l.wish ? l.color : null;
+}
+
+/** Distinct non-wish years across all marks — the "years traveled" stat. */
+function yearsTraveled(marks, lists = LISTS) {
+  const ys = new Set();
+  Object.values(marks || {}).forEach((m) =>
+    visitsOf(m).forEach((v) => {
+      const l = listById(lists, v.listId);
+      if (v.year && !(l && l.wish)) ys.add(v.year);
+    })
+  );
+  return ys.size;
+}
+
+// ---------------------------------------------------------------------------
+// Cloud-sync merge logic
+//
+// Sync is whole-document, revision-based. These pure helpers decide how a cloud document and the
+// local document combine WITHOUT losing data. The rules that matter for data safety:
+//  - reattachPhotos: a cloud/backup copy may have had photos stripped to fit. Never drop a photo we
+//    still hold locally — re-attach by journey id + entry, and by GLOBAL content key so a photo
+//    survives even when a journey's id changed (e.g. a synthetic merge id).
+//  - mergeJourneys: union by id, keeping the richer copy on a clash; never drop a journey.
+//  - mergeLocalInto: when BOTH sides advanced since the last sync (a genuine conflict), union them
+//    rather than picking a winner by wall-clock (a skewed clock silently drops one side).
+// ---------------------------------------------------------------------------
+
+/** Union two [key, ...] pair-lists, keeping the first occurrence of each key. */
+function unionPairs(a, b) {
+  a = Array.isArray(a) ? a : [];
+  b = Array.isArray(b) ? b : [];
+  const seen = new Set(a.map((e) => e[0]));
+  const out = a.slice();
+  b.forEach((e) => { if (!seen.has(e[0])) { seen.add(e[0]); out.push(e); } });
+  return out;
+}
+
+/** Shallow-merge two region maps (per-key object spread; b wins a same-key clash). */
+function mergeRegion(a, b) {
+  const out = { ...(a || {}) };
+  for (const k in (b || {})) out[k] = { ...((a && a[k]) || {}), ...b[k] };
+  return out;
+}
+
+/** Re-attach photos from `oldJ` onto `newJ` (matched by id + entry, then global content key). */
+function reattachPhotos(newJ, oldJ) {
+  if (!Array.isArray(newJ) || !Array.isArray(oldJ)) return newJ;
+  const oldById = new Map();
+  oldJ.forEach((j) => { if (j && j.id) oldById.set(j.id, j); });
+  const ek = (e) => ((e && e.date) || "") + "|" + (((e && e.text) || "").slice(0, 60));
+  // Global content-keyed photo map across ALL old journeys, so a photo survives even when a journey's
+  // id changed and the per-journey id match below misses. Content (date+text) only — never a
+  // cross-journey index, which would mis-assign.
+  const global = new Map();
+  oldJ.forEach((j) => { if (j && Array.isArray(j.journal)) j.journal.forEach((e) => { if (e && e.photo && !global.has(ek(e))) global.set(ek(e), e.photo); }); });
+  newJ.forEach((j) => {
+    if (!j || !Array.isArray(j.journal)) return;
+    const oj = oldById.get(j.id);
+    const byKey = new Map();
+    if (oj && Array.isArray(oj.journal)) oj.journal.forEach((e, i) => { if (e && e.photo) { byKey.set(ek(e), e.photo); byKey.set("#" + i, e.photo); } });
+    j.journal.forEach((e, i) => { if (e && !e.photo) { const p = byKey.get(ek(e)) || byKey.get("#" + i) || global.get(ek(e)); if (p) e.photo = p; } });
+  });
+  return newJ;
+}
+
+/** "Richness" of a journey — more real entries/photos/stops/people ranks higher on an id clash. */
+function journeyScore(j) {
+  if (!j) return -1;
+  const jn = j.journal || [];
+  return jn.filter((e) => e && (e.text || e.photo)).length * 10
+    + jn.filter((e) => e && e.photo).length * 8
+    + (j.stops || []).length + (j.travelers || []).length + (j.remember || []).length;
+}
+
+/** Merge journey arrays by id, never dropping one: union all, keep the richer copy on a clash, and
+ *  drop the seeded Example once any real journey exists. */
+function mergeJourneys(local, cloud, seedIds = new Set()) {
+  local = Array.isArray(local) ? local : [];
+  cloud = Array.isArray(cloud) ? cloud : [];
+  const byId = new Map();
+  const add = (j) => {
+    if (!j) return;
+    const id = j.id || ("nm:" + (j.name || "") + "|" + (j.start || ""));
+    const ex = byId.get(id);
+    if (!ex || journeyScore(j) >= journeyScore(ex)) byId.set(id, j);
+  };
+  local.forEach(add); cloud.forEach(add);
+  let out = [...byId.values()];
+  if (out.some((j) => j && !seedIds.has(j.id))) out = out.filter((j) => j && !seedIds.has(j.id));
+  return out;
+}
+
+/** Conflict resolution: union a local state into a cloud document so nothing is lost. Keyed maps keep
+ *  every key from both (cloud wins a same-key clash, being the newer revision); journeys merge by id
+ *  keeping the richer copy; landmark lists union. Returns a new cloud-shaped document. */
+function mergeLocalInto(local, cloudDoc, seedIds = new Set()) {
+  const c = (cloudDoc && cloudDoc.data && typeof cloudDoc.data === "object") ? cloudDoc.data : (cloudDoc || {});
+  const uni = (loc, cld) => ({ ...(loc && typeof loc === "object" ? loc : {}), ...(cld && typeof cld === "object" ? cld : {}) });
+  const merged = {
+    ...c,
+    marks: uni(local.marks, c.marks),
+    regionMarks: uni(local.regionMarks, c.regionMarks),
+    places: uni(local.places, c.places),
+    airports: uni(local.airports, c.airports),
+    journeys: mergeJourneys(local.journeys, Array.isArray(c.journeys) ? c.journeys : [], seedIds),
+    extraUnesco: unionPairs(local.extraUnesco, c.extraUnesco),
+    extraParks: unionPairs(local.extraParks, c.extraParks),
+    lists: (Array.isArray(c.lists) && c.lists.length) ? c.lists : local.lists,
+  };
+  return { ...(cloudDoc || {}), data: merged };
+}
+return { LISTS, listById, visitsOf, listRank, primaryVisit, syncPrimary, isWish, colorFor, yearsTraveled, unionPairs, mergeRegion, reattachPhotos, mergeJourneys, mergeLocalInto };
+})();
+// adapter — bind the app's live state.lists + seed ids to the pure core (call sites stay unchanged)
+const listById = (id) => __wlcore.listById(state.lists, id);
+const visitsOf = __wlcore.visitsOf;
+const listRank = (id) => __wlcore.listRank(id, state.lists);
+const primaryVisit = (m) => __wlcore.primaryVisit(m, state.lists);
+const syncPrimary = (m) => __wlcore.syncPrimary(m, state.lists);
+const isWish = (m) => __wlcore.isWish(m, state.lists);
+const colorFor = (m) => __wlcore.colorFor(m, state.lists);
+const _unionPairs = __wlcore.unionPairs;
+const _mergeRegion = __wlcore.mergeRegion;
+const _reattachPhotos = __wlcore.reattachPhotos;
+const _seedJourneyIds = () => new Set((typeof SEED_JOURNEYS !== 'undefined' ? SEED_JOURNEYS : []).map((j) => j && j.id).filter(Boolean));
+const _mergeJourneys = (local, cloud) => __wlcore.mergeJourneys(local, cloud, _seedJourneyIds());
+const _mergeLocalInto = (cloudDoc) => __wlcore.mergeLocalInto(state, cloudDoc, _seedJourneyIds());
+// ==== core:end ====
 
 // ---------------- tap vs long-press ----------------
 let lpTimer=null, lpFired=false, lpSx=0, lpSy=0, lpMoved=false;
@@ -2334,8 +2531,8 @@ async function buildPassportCard(){
   await ensureWfeats();
   const cs=getComputedStyle(document.documentElement), tok=(n,f)=>(cs.getPropertyValue(n).trim()||f);
   const paper=tok('--paper','#f7efe0'), ink=tok('--ink','#2a2118'), muted=tok('--muted','#9a8f7d'),
-    accent=tok('--accent','#d4561f'), accent2=tok('--accent2','#caa24a'), ocean=tok('--ocean','#efe4cf'),
-    field=tok('--field','#fff'), rule=tok('--rule','#0002'), onAcc=tok('--on-accent','#fff'),
+    accent=tok('--accent','#d4561f'),
+    field=tok('--field','#fff'), rule=tok('--rule','#0002'),
     fDisp=tok('--font-display','700 system-ui'), fBody=tok('--font','system-ui'), fHand=tok('--font-hand',fBody);
   const visited=Object.entries(state.marks).filter(([id,m])=>!isWish(m)).map(([id])=>id);
   const wish=Object.values(state.marks).filter(m=>isWish(m)).length;
@@ -2582,7 +2779,7 @@ function maybeShowShared(){
     document.getElementById('shared-view').innerHTML=`<div class="shared-card">
       <div class="eyebrow" style="color:var(--accent)">Wanderlines passport</div>
       <h2 style="font-family:var(--font-display);margin:6px 0 2px">${(data.n||'A traveler')}</h2>
-      <p class="lead" style="margin:0 0 14px">${codes.length} countries · ${Math.round(codes.length/195*100)}% of the world</p>
+      <p class="lead" style="margin:0 0 14px">${codes.length} countries · ${Math.round(codes.length/177*100)}% of the world</p>
       <div class="flag-grid">${flags}</div>
       <button class="btn primary" id="shared-dismiss" style="margin-top:18px;width:100%;justify-content:center">Make your own ›</button></div>`;
     document.getElementById('shared-view').classList.add('open');
@@ -3217,8 +3414,6 @@ function applyNames(on,save){
 document.querySelectorAll('#names-seg button').forEach(b=>b.onclick=()=>applyNames(b.dataset.nn==='1',true));
 
 // ---------------- share (OS share sheet) ----------------
-function currentMapSvg(){ return document.getElementById('view-world').classList.contains('hidden')
-  ? document.getElementById('region-svg') : document.getElementById('world-svg'); }
 async function shareMap(svgNode){
   const w=svgNode.clientWidth,h=svgNode.clientHeight,scale=2;
   const clone=svgNode.cloneNode(true);
@@ -3487,19 +3682,8 @@ function setSynced(rev){ syncedRev=(+rev)||0; localDirty=false;
 function authMsg(t,kind){ const el=$('auth-msg'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; el.style.color=(kind==='err')?'var(--accent)':'var(--muted)'; }
 
 // Hydrate the whole app from a saved cloud blob (same shape as Export/Backup), without a page reload.
-const _mergeRegion=(a,b)=>{ const out={...(a||{})}; for(const k in (b||{})) out[k]={...(a&&a[k]||{}), ...b[k]}; return out; };
-const _unionPairs=(a,b)=>{ a=Array.isArray(a)?a:[]; b=Array.isArray(b)?b:[]; const seen=new Set(a.map(e=>e[0])), out=a.slice(); b.forEach(e=>{ if(!seen.has(e[0])){ seen.add(e[0]); out.push(e); } }); return out; };
-// Merge journey arrays by id, NEVER dropping a journey: union all, and on an id clash keep the
-// richer copy (more journal entries/photos/stops). Prevents a sparse/seed cloud from wiping journeys.
-const _seedJourneyIds=()=>new Set((SEED_JOURNEYS||[]).map(j=>j&&j.id).filter(Boolean));
-function _mergeJourneys(local,cloud){ local=Array.isArray(local)?local:[]; cloud=Array.isArray(cloud)?cloud:[];
-  const score=j=>j?((j.journal||[]).filter(e=>e&&(e.text||e.photo)).length*10 + (j.journal||[]).filter(e=>e&&e.photo).length*8 + (j.stops||[]).length + (j.travelers||[]).length + (j.remember||[]).length):-1;
-  const byId=new Map(), add=j=>{ if(!j) return; const id=j.id||('nm:'+(j.name||'')+'|'+(j.start||'')); const ex=byId.get(id); if(!ex||score(j)>=score(ex)) byId.set(id,j); };
-  local.forEach(add); cloud.forEach(add);
-  let out=[...byId.values()]; const seed=_seedJourneyIds();
-  if(out.some(j=>j&&!seed.has(j.id))) out=out.filter(j=>j&&!seed.has(j.id));   // drop the example once real journeys exist
-  return out;
-}
+// The sync-merge helpers (_mergeRegion, _unionPairs, _seedJourneyIds, _mergeJourneys, _mergeLocalInto,
+// _reattachPhotos) come from the generated core region above — see projects/wanderlines/src/core.mjs.
 // Remove the seeded Example Journey whenever the user has any real journey of their own.
 function dropExampleIfReal(){ if(!Array.isArray(state.journeys)) return false; const seed=_seedJourneyIds();
   if(state.journeys.some(j=>j&&!seed.has(j.id)) && state.journeys.some(j=>j&&seed.has(j.id))){
@@ -3513,18 +3697,8 @@ function localHasRealData(){ const seed=_seedJourneyIds();
 // Replace the ENTIRE in-memory state from a cloud/backup document. No field-by-field merging:
 // what the document says IS the state. This is what stops countries from accumulating forever.
 // When we replace local journeys with a cloud/backup copy, that copy may have had its photos stripped
-// to fit the cloud. NEVER drop a photo we still hold locally: re-attach any local photo the incoming
-// copy is missing, matched by journey id + entry (date+text, with an index fallback).
-function _reattachPhotos(newJ, oldJ){
-  if(!Array.isArray(newJ)||!Array.isArray(oldJ)) return newJ;
-  const oldById=new Map(); oldJ.forEach(j=>{ if(j&&j.id) oldById.set(j.id,j); });
-  const ek=e=>((e&&e.date)||'')+'|'+(((e&&e.text)||'').slice(0,60));
-  newJ.forEach(j=>{ if(!j||!Array.isArray(j.journal)) return; const oj=oldById.get(j.id); if(!oj||!Array.isArray(oj.journal)) return;
-    const byKey=new Map(); oj.journal.forEach((e,i)=>{ if(e&&e.photo){ byKey.set(ek(e),e.photo); byKey.set('#'+i,e.photo); } });
-    j.journal.forEach((e,i)=>{ if(e && !e.photo){ const p=byKey.get(ek(e))||byKey.get('#'+i); if(p) e.photo=p; } });
-  });
-  return newJ;
-}
+// to fit the cloud. NEVER drop a photo we still hold locally: _reattachPhotos (from core) re-attaches any
+// local photo the incoming copy is missing, matched by journey id + entry, then by global content key.
 function adoptDocument(doc){
   const d=(doc&&doc.data&&typeof doc.data==='object')?doc.data:(doc||{});
   const _localJ=Array.isArray(state.journeys)?state.journeys:[];   // keep our photos before we replace
@@ -3644,13 +3818,17 @@ async function loadCloudInto(){
     if(syncedRev===0 && cloudRev===0 && localHasRealData()){ await pushCloud(true); return 'pushed-local'; }
     adoptDocument(cloudDoc); setSynced(cloudRev); saveStateLocal(); return 'hydrated';
   }
-  // We have local edits. Decide by revision, then by timestamp.
+  // We have local edits AND the cloud advanced past what we last synced -> a genuine two-sided conflict.
+  // Don't gamble on wall-clock timestamps (a skewed clock silently drops one side). Union both documents
+  // so nothing is lost, adopt the merge, and push it up as the next revision.
   if(cloudRev>syncedRev){
-    const cloudTs=Date.parse(row.updated_at)||0; let localTs=0;
-    try{ localTs=Date.parse((JSON.parse(localStorage.getItem('wl_data')||'{}')||{})._ts)||0; }catch(_){}
-    if(cloudTs>=localTs){ adoptDocument(cloudDoc); setSynced(cloudRev); saveStateLocal(); return 'hydrated'; }
+    adoptDocument(_mergeLocalInto(cloudDoc));
+    setSynced(cloudRev);        // so pushCloud's next rev lands strictly above the cloud we just merged
+    saveStateLocal();
+    await pushCloud(true);
+    return 'merged';
   }
-  // Local builds on (or is newer than) the cloud -> push local up as the next revision.
+  // Cloud hasn't moved past us (cloudRev<=syncedRev) -> local is the truth; push it up as the next revision.
   syncedRev=Math.max(syncedRev,cloudRev);
   await pushCloud(true);
   return 'pushed-local';
@@ -3746,16 +3924,24 @@ let lastSaveTs='';
 // those we ALWAYS stash every journal photo in IndexedDB (large quota) and restore them on load if the
 // main copy ever dropped them. Purely additive: if IDB fails it's caught and nothing else changes.
 let _photoDB=null;
+// Guard against the load-time race: until we've READ the IDB backstop on startup, in-memory journeys
+// may still be missing photos (localStorage couldn't hold them). Saving before then would replace the
+// backstop with a photo-poor map and destroy the very copy restorePhotosFromIDB is about to reattach.
+let _photosRestored=false;
 function _openPhotoDB(){ return new Promise(res=>{ if(_photoDB) return res(_photoDB);
   try{ const r=indexedDB.open('wl_photos',1); r.onupgradeneeded=()=>{ try{ r.result.createObjectStore('p'); }catch(_){} };
     r.onsuccess=()=>{ _photoDB=r.result; res(_photoDB); }; r.onerror=()=>res(null); }catch(_){ res(null); } }); }
 function _photoKey(jId,e){ return (jId||'')+'|'+((e&&e.date)||'')+'|'+(((e&&e.text)||'').slice(0,60)); }
-async function savePhotosIDB(){ try{ const db=await _openPhotoDB(); if(!db) return;
+async function savePhotosIDB(){ if(!_photosRestored) return;   // don't overwrite the backstop before the load-time read
+  try{ const db=await _openPhotoDB(); if(!db) return;
   const map={}; (state.journeys||[]).forEach(j=>{ if(!j||!Array.isArray(j.journal)) return; j.journal.forEach(e=>{ if(e&&typeof e.photo==='string'&&e.photo.length>200) map[_photoKey(j.id,e)]=e.photo; }); });
   const tx=db.transaction('p','readwrite'); tx.objectStore('p').put(map,'all'); }catch(_){} }
 async function loadPhotosIDB(){ try{ const db=await _openPhotoDB(); if(!db) return null;
   return await new Promise(res=>{ const g=db.transaction('p','readonly').objectStore('p').get('all'); g.onsuccess=()=>res(g.result||null); g.onerror=()=>res(null); }); }catch(_){ return null; } }
-async function restorePhotosFromIDB(){ const map=await loadPhotosIDB(); if(!map) return false; let changed=false;
+async function restorePhotosFromIDB(){ const map=await loadPhotosIDB();
+  // We've now read the backstop (even if empty); memory is authoritative from here, so saves may run.
+  _photosRestored=true;
+  if(!map) return false; let changed=false;
   (state.journeys||[]).forEach(j=>{ if(!j||!Array.isArray(j.journal)) return; j.journal.forEach(e=>{ if(e && !e.photo){ const p=map[_photoKey(j.id,e)]; if(p){ e.photo=p; changed=true; } } }); });
   return changed; }
 function saveStateLocal(){ lastSaveTs=new Date().toISOString();
@@ -3811,7 +3997,8 @@ migrateStopNotesToJournal();   // fold any legacy per-stop notes into the journa
 backfillJourneyLandmarks();    // surface park/UNESCO journey stops in their lists
 // Restore any photos that localStorage couldn't hold (or that a sync dropped) from the IndexedDB backstop.
 restorePhotosFromIDB().then(ch=>{ if(ch){ try{ if(document.getElementById('view-itinerary')&&!document.getElementById('view-itinerary').classList.contains('hidden')) renderItinerary&&renderItinerary(); }catch(_){}
-  try{ if(typeof refreshViews==='function') refreshViews(); }catch(_){} } }).catch(()=>{});
+  try{ if(typeof refreshViews==='function') refreshViews(); }catch(_){} } }).catch(()=>{ _photosRestored=true; });
+setTimeout(()=>{ _photosRestored=true; },4000);   // hang fallback: never disable photo backups forever if IDB stalls
 setTimeout(shrinkExistingPhotos,1200);   // quietly shrink any oversized photos saved before compression existed
 loadCountryData();
 let savedNative=false; try{ savedNative=localStorage.getItem('wl_native')==='1'; }catch(e){} state.nativeNames=savedNative;
