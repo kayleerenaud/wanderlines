@@ -1034,13 +1034,8 @@
       <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.1 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.3 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.5 3-2.2 5.5-4.7 7.2l7.3 5.7c4.3-4 6.8-9.9 6.8-17.4z"/><path fill="#FBBC05" d="M10.4 28.3c-.5-1.4-.8-3-.8-4.8s.3-3.3.8-4.8l-7.8-6.1C.9 16 0 19.9 0 24s.9 8 2.6 11.4l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.5l-7.3-5.7c-2 1.4-4.7 2.3-7.7 2.3-6.3 0-11.7-3.8-13.6-9.3l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
       Continue with Google
     </button>
-    <div class="divider">OR</div>
-    <div class="field hide" id="name-field"><label>Name</label><input type="text" id="au-name" placeholder="Your name" autocomplete="name"/></div>
-    <div class="field"><label>Email</label><input type="email" id="au-email" placeholder="you@email.com" autocomplete="email"/></div>
-    <div class="field"><label>Password</label><input type="password" id="au-pass" placeholder="••••••••" autocomplete="current-password"/></div>
-    <button class="btn primary" id="auth-submit">Sign in</button>
     <div class="auth-msg" id="auth-msg" style="display:none;margin-top:10px;font-size:12.5px;line-height:1.45;text-align:center"></div>
-    <div class="auth-foot" id="auth-foot">Don't have an account? <a id="auth-toggle">Create one</a></div>
+    <p class="auth-foot" style="color:var(--muted);font-size:12px;line-height:1.5;text-align:center;margin:14px 0 0">Sign in with Google to save your map and sync it across devices.</p>
   </div>
 </div>
 
@@ -3648,20 +3643,7 @@ window.addEventListener('resize',()=>{ if(!document.getElementById('view-world')
   if(!document.getElementById('view-region').classList.contains('hidden')&&rfeats) drawRegion(); });
 
 // ---------------- auth (mocked - prototype only) ----------------
-let authMode='signin';
 const $=id=>document.getElementById(id);
-function setAuthMode(m){
-  authMode=m;
-  $('auth-title').textContent = m==='signin'?'Sign in':'Create account';
-  $('auth-submit').textContent = m==='signin'?'Sign in':'Create account';
-  $('name-field').classList.toggle('hide', m==='signin');
-  $('au-pass').setAttribute('autocomplete', m==='signin'?'current-password':'new-password');
-  $('auth-foot').innerHTML = m==='signin'
-    ? `Don't have an account? <a id="auth-toggle">Create one</a>`
-    : `Already have an account? <a id="auth-toggle">Sign in</a>`;
-  $('auth-toggle').onclick=()=>setAuthMode(authMode==='signin'?'signup':'signin');
-}
-$('auth-toggle').onclick=()=>setAuthMode(authMode==='signin'?'signup':'signin');
 
 // ---------------- Supabase backend: real accounts + cross-device sync ----------------
 const SB_URL='https://dkwhsvrgounkzwxncgmv.supabase.co';
@@ -3860,35 +3842,16 @@ function enterApp(email){ state.user=email||'traveler@wanderlines.app'; const ae
   let seen=false; try{ seen=localStorage.getItem('wl_seen_help')==='1'; }catch(e){}
   if(!seen){ try{ localStorage.setItem('wl_seen_help','1'); }catch(e){} setTimeout(()=>$('help').classList.add('open'),550); } }
 
-$('auth-submit').onclick=async()=>{
-  const email=$('au-email').value.trim(), pass=$('au-pass').value, name=($('au-name')&&$('au-name').value.trim())||'';
-  if(!sb){ authMsg('Can’t reach the sign-in service right now. Check your connection and reload.','err'); return; }
-  if(!email||!pass){ authMsg('Enter your email and a password (6+ characters).','err'); return; }
-  const btn=$('auth-submit'), label=btn.textContent; btn.disabled=true; btn.textContent='One sec…'; authMsg('');
-  try{
-    if(authMode==='signup'){
-      const {data,error}=await sb.auth.signUp({ email, password:pass, options:{ data:{ name } } });
-      if(error){ authMsg(error.message,'err'); }
-      else if(data.session){ await onSignedIn(data.session); }
-      else { authMsg('Almost there! We sent a confirmation link to '+email+'. Click it, then come back and sign in.'); setAuthMode('signin'); }
-    } else {
-      const {data,error}=await sb.auth.signInWithPassword({ email, password:pass });
-      if(error){ authMsg(/confirm/i.test(error.message)?'Please confirm your email first (check your inbox), then sign in.':error.message,'err'); }
-      else if(data.session){ await onSignedIn(data.session); }
-    }
-  }catch(e){ authMsg('Something went wrong. Please try again.','err'); }
-  btn.disabled=false; btn.textContent=label;
-};
 $('google-btn').onclick=async()=>{
   if(!sb){ authMsg('Can’t reach the sign-in service. Reload and try again.','err'); return; }
   authMsg('Opening Google…');
   try{
     const {error}=await sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin+location.pathname } });
     if(error){ authMsg(/provider|not enabled|unsupported/i.test(error.message)
-      ? 'Google sign-in isn’t switched on yet. Use email & password for now.'
+      ? 'Google sign-in isn’t switched on yet — try again shortly.'
       : error.message, 'err'); }
     // on success the browser redirects to Google, then back here signed in
-  }catch(e){ authMsg('Google sign-in failed. Use email & password for now.','err'); }
+  }catch(e){ authMsg('Google sign-in failed. Please try again.','err'); }
 };
 const signout=$('signout-btn'); if(signout) signout.onclick=async()=>{
   try{ if(sb) await sb.auth.signOut(); }catch(e){}
