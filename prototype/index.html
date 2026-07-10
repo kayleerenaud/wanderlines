@@ -1558,6 +1558,28 @@ function go(view){
   if(view==='account'){ renderAccount(); buildThemeGrid(); renderUnits(); renderNames(); }
 }
 
+// French Guiana is an overseas department baked into France's geometry in the world atlas (ISO 250),
+// so scratching France would also color it in South America. Split it into its own country (ISO 254 /
+// GF), which the country dataset already knows (name, flag, continent). Applied wherever wfeats is built.
+function splitFrenchGuiana(features){
+  try{
+    const fr=features.find(f=>f&&f.id==='250'); if(!fr||!fr.geometry) return features;
+    const polys = fr.geometry.type==='MultiPolygon' ? fr.geometry.coordinates
+                : fr.geometry.type==='Polygon' ? [fr.geometry.coordinates] : null;
+    if(!polys) return features;
+    // classify by the polygon's rough centroid; French Guiana is the only French piece in NE South America
+    const inGuiana=poly=>{ const ring=poly&&poly[0]; if(!ring||!ring.length) return false;
+      let sx=0,sy=0; ring.forEach(p=>{ sx+=p[0]; sy+=p[1]; }); const lon=sx/ring.length, lat=sy/ring.length;
+      return lon>-56&&lon<-50&&lat>1&&lat<7; };
+    const fg=polys.filter(inGuiana), rest=polys.filter(p=>!inGuiana(p));
+    if(!fg.length) return features;                       // nothing matched (data changed) -> leave as-is
+    fr.geometry={ type:'MultiPolygon', coordinates:rest };
+    try{ NAMES['254']='French Guiana'; }catch(_){}
+    features.push({ type:'Feature', id:'254', properties:{ name:'French Guiana' },
+      geometry:{ type:'MultiPolygon', coordinates:fg } });
+  }catch(_){}
+  return features;
+}
 // ---------------- world map ----------------
 const wsvg=d3.select('#world-svg');
 const wSphere=wsvg.append('g'), wLand=wsvg.append('g'), wMarks=wsvg.append('g'), wRoute=wsvg.append('g');
@@ -1569,7 +1591,7 @@ function ensureWorld(){
   const el=document.getElementById('world-svg');
   if(!wfeats){
     d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json').then(world=>{
-      wfeats=topojson.feature(world,world.objects.countries).features.filter(f=>f.properties.name!=='Antarctica');
+      wfeats=splitFrenchGuiana(topojson.feature(world,world.objects.countries).features.filter(f=>f.properties.name!=='Antarctica'));
       drawWorld();
     });
   } else drawWorld();
@@ -2485,7 +2507,7 @@ function hex2rgb(h){ h=(h||'').trim().replace('#',''); if(h.length===3) h=h.spli
 function mixHex(a,b,t){ const A=hex2rgb(a),B=hex2rgb(b); return 'rgb('+A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(',')+')'; }
 async function ensureWfeats(){ if(wfeats) return wfeats;
   try{ const w=await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json');
-    if(!wfeats) wfeats=topojson.feature(w,w.objects.countries).features.filter(f=>f.properties.name!=='Antarctica'); }catch(e){}
+    if(!wfeats) wfeats=splitFrenchGuiana(topojson.feature(w,w.objects.countries).features.filter(f=>f.properties.name!=='Antarctica')); }catch(e){}
   return wfeats; }
 // paint the user's scratch-off world (visited/lived colors, wishlist tint) onto a canvas region
 function drawScratchMap(x, gx, gy, gw, gh, t){
