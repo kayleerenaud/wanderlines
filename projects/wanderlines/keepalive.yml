@@ -1,0 +1,28 @@
+name: Supabase keepalive
+
+# Supabase pauses free-tier projects after 7 days with no database traffic.
+# This sends one tiny read every 3 days so the inactivity clock never runs out.
+# The key below is the PUBLIC anon key already shipped in index.html - not a secret.
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'   # every 3 days at 06:17 UTC
+  workflow_dispatch:          # lets you run it by hand from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        run: |
+          code=$(curl -sS -o /tmp/body.txt -w '%{http_code}' -m 30 \
+            "https://dkwhsvrgounkzwxncgmv.supabase.co/rest/v1/user_data?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrd2hzdnJnb3Vua3p3eG5jZ212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MTQwODgsImV4cCI6MjA5ODA5MDA4OH0.reI4vPEe5WrohcKgmSoPSV3d0z58hJrnm2vNIYNCfic" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrd2hzdnJnb3Vua3p3eG5jZ212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MTQwODgsImV4cCI6MjA5ODA5MDA4OH0.reI4vPEe5WrohcKgmSoPSV3d0z58hJrnm2vNIYNCfic")
+          echo "HTTP $code"
+          cat /tmp/body.txt
+          if [ "$code" != "200" ]; then
+            echo "::error::Supabase did not return 200 - project may be paused or down."
+            exit 1
+          fi
+          echo "Supabase is awake."
