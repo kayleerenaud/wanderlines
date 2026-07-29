@@ -16,7 +16,7 @@ jobs:
       - name: Ping Supabase
         run: |
           code=$(curl -sS -o /tmp/body.txt -w '%{http_code}' -m 30 \
-            "https://dkwhsvrgounkzwxncgmv.supabase.co/rest/v1/user_data?select=id&limit=1" \
+            "https://dkwhsvrgounkzwxncgmv.supabase.co/rest/v1/user_data?select=*&limit=1" \
             -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrd2hzdnJnb3Vua3p3eG5jZ212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MTQwODgsImV4cCI6MjA5ODA5MDA4OH0.reI4vPEe5WrohcKgmSoPSV3d0z58hJrnm2vNIYNCfic" \
             -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrd2hzdnJnb3Vua3p3eG5jZ212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MTQwODgsImV4cCI6MjA5ODA5MDA4OH0.reI4vPEe5WrohcKgmSoPSV3d0z58hJrnm2vNIYNCfic")
           echo "HTTP $code"
